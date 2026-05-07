@@ -1,0 +1,1 @@
+select  instance,time,user,host,query_time,wait_time,db,index_names,query from INFORMATION_SCHEMA.CLUSTER_SLOW_QUERY d where  Query not like '%<_%>%'  AND is_internal = '0' order by d.Query_time desc  limit 20

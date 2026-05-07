@@ -1,0 +1,59 @@
+{
+  "id": "oracle",
+  "name": "Oracle",
+  "description": "Oracle 数据库巡检",
+  "icon": "database-zap",
+  "defaultPort": 1521,
+  "fields": [
+    {
+      "name": "host",
+      "label": "主机地址",
+      "type": "text",
+      "defaultValue": "",
+      "required": true,
+      "tooltip": "Oracle数据库服务器地址",
+      "placeholder": "192.168.1.100"
+    },
+    {
+      "name": "port",
+      "label": "端口",
+      "type": "number",
+      "defaultValue": "1521",
+      "required": true,
+      "tooltip": "数据库端口，Oracle默认1521"
+    },
+    {
+      "name": "username",
+      "label": "用户名",
+      "type": "text",
+      "defaultValue": "system",
+      "required": true,
+      "tooltip": "数据库登录用户名"
+    },
+    {
+      "name": "password",
+      "label": "密码",
+      "type": "password",
+      "defaultValue": "",
+      "required": false,
+      "tooltip": "数据库登录密码"
+    },
+    {
+      "name": "database",
+      "label": "服务名(SID)",
+      "type": "text",
+      "defaultValue": "ORCL",
+      "required": true,
+      "tooltip": "Oracle服务名或SID"
+    },
+    {
+      "name": "description",
+      "label": "连接描述",
+      "type": "text",
+      "defaultValue": "",
+      "required": true,
+      "tooltip": "连接的描述信息，便于识别"
+    }
+  ],
+  "supportedFeatures": ["query", "inspection", "report", "ai-analysis"]
+}

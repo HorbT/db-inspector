@@ -1,0 +1,1 @@
+SELECT * FROM sys.statement_analysis WHERE tmp_tables > 0 ORDER BY tmp_tables DESC LIMIT 10;

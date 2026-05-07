@@ -1,0 +1,1 @@
+SELECT * FROM sys.statement_analysis WHERE full_scan = '*' order by exec_count desc limit 10;

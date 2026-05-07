@@ -1,0 +1,1 @@
+select * from performance_schema.data_lock_waits;

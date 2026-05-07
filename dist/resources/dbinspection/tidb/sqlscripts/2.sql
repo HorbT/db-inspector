@@ -1,0 +1,1 @@
+select tidb_version()

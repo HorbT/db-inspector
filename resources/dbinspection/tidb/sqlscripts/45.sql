@@ -1,0 +1,1 @@
+select * from information_schema.inspection_result

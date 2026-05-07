@@ -1,0 +1,1 @@
+select * from performance_schema.setup_instruments WHERE name='wait/lock/metadata/sql/mdl';

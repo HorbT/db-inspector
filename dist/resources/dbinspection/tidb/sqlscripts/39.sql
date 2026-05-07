@@ -1,0 +1,1 @@
+SELECT * FROM information_schema.tiflash_replica limit 50

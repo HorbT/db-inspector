@@ -1,0 +1,1 @@
+select * from sys.schema_unused_indexes ORDER BY 1,2,3;

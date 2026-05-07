@@ -1,0 +1,59 @@
+{
+  "id": "mysql",
+  "name": "MySQL",
+  "description": "MySQL 数据库巡检",
+  "icon": "database",
+  "defaultPort": 3306,
+  "fields": [
+    {
+      "name": "host",
+      "label": "主机地址",
+      "type": "text",
+      "defaultValue": "",
+      "required": true,
+      "tooltip": "MySQL数据库服务器地址",
+      "placeholder": "192.168.1.100"
+    },
+    {
+      "name": "port",
+      "label": "端口",
+      "type": "number",
+      "defaultValue": "3306",
+      "required": true,
+      "tooltip": "数据库端口，MySQL默认3306"
+    },
+    {
+      "name": "username",
+      "label": "用户名",
+      "type": "text",
+      "defaultValue": "root",
+      "required": true,
+      "tooltip": "数据库登录用户名"
+    },
+    {
+      "name": "password",
+      "label": "密码",
+      "type": "password",
+      "defaultValue": "",
+      "required": false,
+      "tooltip": "数据库登录密码"
+    },
+    {
+      "name": "database",
+      "label": "数据库名",
+      "type": "text",
+      "defaultValue": "mysql",
+      "required": true,
+      "tooltip": "MySQL数据库名"
+    },
+    {
+      "name": "description",
+      "label": "连接描述",
+      "type": "text",
+      "defaultValue": "",
+      "required": true,
+      "tooltip": "连接的描述信息，便于识别"
+    }
+  ],
+  "supportedFeatures": ["query", "inspection", "report", "ai-analysis"]
+}

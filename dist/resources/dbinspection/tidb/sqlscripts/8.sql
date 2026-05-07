@@ -1,0 +1,1 @@
+select address,store_state_name,capacity,available,leader_count,uptime from INFORMATION_SCHEMA.TIKV_STORE_STATUS

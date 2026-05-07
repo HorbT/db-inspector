@@ -1,0 +1,1 @@
+select * from sys.session where conn_id!=connection_id() and trx_state='COMMITTED' and db is not null limit 100

@@ -1,0 +1,1 @@
+select 'Server Name:'+ltrim(@@servername)

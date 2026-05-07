@@ -1,0 +1,42 @@
+appId: com.dbinspector.app
+productName: DB Inspector
+copyright: Copyright 2024 DB Inspector Team
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - resources/**/*
+  - python-backend/**/*
+  - package.json
+
+extraResources:
+  - from: resources/
+    to: resources/
+  - from: python-backend/
+    to: python-backend/
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: ${productName}-${version}-Setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: DB Inspector
+
+asar: true
+
+asarUnpack:
+  - python-backend/**
+  - resources/dbinspection/**

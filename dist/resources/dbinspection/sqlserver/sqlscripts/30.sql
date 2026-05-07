@@ -1,0 +1,1 @@
+select * from sysperfinfo where counter_name like '%Memory%'

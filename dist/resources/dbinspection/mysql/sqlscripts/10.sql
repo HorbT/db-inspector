@@ -1,0 +1,1 @@
+select * from information_schema.`PROCESSLIST`  a where a.command<>'Sleep' and a.id<>CONNECTION_id() limit 100;

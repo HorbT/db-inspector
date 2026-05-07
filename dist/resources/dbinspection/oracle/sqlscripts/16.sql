@@ -1,0 +1,1 @@
+SELECT * FROM gv$asm_client;

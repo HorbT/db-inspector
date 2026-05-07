@@ -1,0 +1,1 @@
+select type,instance,version,start_time,uptime,server_id from INFORMATION_SCHEMA.cluster_info  order by type,instance

@@ -1,0 +1,1 @@
+select * from performance_schema.events_stages_current;

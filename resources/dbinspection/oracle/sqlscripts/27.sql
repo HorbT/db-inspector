@@ -1,0 +1,1 @@
+SELECT inst_id,name,round(bytes/1024/1024) 值MB ,resizeable 是否可调 FROM gv$sgainfo;

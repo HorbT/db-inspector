@@ -1,0 +1,23 @@
+SELECT A.CON_ID,
+       A.USERNAME,
+       -- 简化DECODE（原逻辑中OPEN和其他状态返回值一致，可直接保留字段）
+       A.ACCOUNT_STATUS,
+       NVL(TO_CHAR(A.EXPIRY_DATE, 'yyyy-mm-dd HH24:MI:SS'), '') EXPIRY_DATE,
+       A.DEFAULT_TABLESPACE,
+       A.TEMPORARY_TABLESPACE,
+       TO_CHAR(A.CREATED, 'yyyy-mm-dd HH24:MI:SS') CREATED,
+       A.PROFILE,
+       NVL(DECODE(P.SYSDBA, 'TRUE', 'TRUE', ''), '') SYSDBA,
+       NVL(DECODE(P.SYSOPER, 'TRUE', 'TRUE', ''), '') SYSOPER,
+       -- 保留ACCOUNT_STATUS#的子查询（USER_ASTATUS_MAP是公开视图，system有权限）
+       (SELECT B.STATUS#
+          FROM SYS.USER_ASTATUS_MAP B
+         WHERE B.STATUS = A.ACCOUNT_STATUS) ACCOUNT_STATUS#,
+       -- 🔴 移除SYS.USER$子查询，直接使用CDB_USERS的PASSWORD字段
+       A.PASSWORD,
+       A.COMMON
+  FROM CDB_USERS A
+  -- 左连接V$PWFILE_USERS（保留原权限判断逻辑）
+  LEFT JOIN V$PWFILE_USERS P
+    ON A.USERNAME = P.USERNAME
+ ORDER BY A.CON_ID, A.USERNAME;

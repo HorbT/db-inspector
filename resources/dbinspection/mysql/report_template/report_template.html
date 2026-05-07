@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{description}} 数据库巡检报告</title>
+    <!-- 引入Tailwind CSS（本地优先） -->
+    <script src="../report_template/libs/tailwindcss.min.js"
+            onerror="this.remove(); const cdnScript = document.createElement('script'); cdnScript.src='https://cdn.tailwindcss.com'; document.head.appendChild(cdnScript);">
+    </script>
+
+    <!-- 引入Font Awesome（本地优先） -->
+    <link href="../report_template/libs/font-awesome/css/font-awesome.min.css"
+          rel="stylesheet"
+          onerror="this.remove(); const cdnLink = document.createElement('link'); cdnLink.rel='stylesheet'; cdnLink.href='https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css'; document.head.appendChild(cdnLink);">
+
+    <!-- 配置Tailwind自定义颜色和字体 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        accent: '#722ED1',
+                        neutral: '#F2F3F5',
+                        'neutral-dark': '#4E5969',
+                        'neutral-light': '#F7F8FA',
+                        success: '#52C41A',
+                        warning: '#FAAD14',
+                        danger: '#FF4D4F',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['Consolas', 'Monaco', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- 自定义工具类 -->
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .transition-transform-opacity {
+                transition-property: transform, opacity;
+            }
+
+                    /* 表格全局样式 */
+            table {
+                width: 100%;
+                border-collapse: collapse; /* 合并边框 */
+                margin: 1rem 0; /* 上下外边距，与内容区保持间距 */
+                font-size: 0.875rem; /* 适配报告类文档的紧凑字体 */
+            }
+
+            /* 表头样式 */
+            table th {
+                background-color: theme('colors.neutral-light'); /* 使用自定义浅色背景 */
+                color: theme('colors.neutral-dark'); /* 深色文字，提升可读性 */
+                font-weight: 600; /* 半粗体，突出表头 */
+                text-align: left; /* 左对齐，符合数据阅读习惯 */
+                padding: 0.75rem 1rem; /* 内边距，避免内容拥挤 */
+                border: 1px solid theme('colors.neutral'); /* 浅色边框，柔和不刺眼 */
+            }
+
+            /* 单元格样式 */
+            table td {
+                padding: 0.75rem 1rem; /* 与表头保持一致的内边距 */
+                border: 1px solid theme('colors.neutral'); /* 统一边框样式 */
+                color: theme('colors.gray-800'); /* 正文文字颜色 */
+            }
+
+            /* 行悬停效果（提升交互体验） */
+            table tr:hover {
+                background-color: theme('colors.secondary/0.5'); /* 使用主题主色调的淡蓝色（15%透明度），色差明显 */
+                            transition: background-color 0.2s ease; /* 平滑过渡 */
+            }
+
+            /* 响应式处理：小屏幕下表格横向滚动 */
+            .result-section {
+                overflow-x: auto; /* 横向滚动容器 */
+                margin: 1rem 0;
+            }
+
+            .result-section table {
+              table-layout: auto; /* 关键：列宽由内容自动计算，而非强制等分 */
+              width: auto;        /* 表格占满父容器宽度（若需更紧凑，可改为 auto） */
+              min-width: 100%; /* 可选：当表格过窄时，至少占满父容器宽度 */
+            }
+
+            /* 表头与单元格通用样式 */
+            .result-section th,.result-section td {
+              overflow-wrap: break-word; /* 兼容更多浏览器 */
+              padding: 8px 12px;     /* 增加内边距，让内容不拥挤 */
+              vertical-align: top;   /* 文字顶部对齐，行高更灵活 */
+            }
+        }
+    </style>
+
+    <style>
+        /* 平滑滚动 */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* 导航激活项动画 */
+        .nav-item.active {
+            position: relative;
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background-color: #165DFF;
+            transition: all 0.3s ease;
+        }
+
+        .main-content {
+            margin-left: 0;
+        }
+
+        @media (min-width: 1024px) { /* lg断点 */
+            .main-content {
+                margin-left: 300px; /* 与导航栏宽度一致 */
+            }
+        }
+
+        /* 内容区块淡入动画 */
+        .content-section {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .content-section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 antialiased">
+    <div class="flex flex-col lg:flex-row min-h-screen">
+        <div class="flex flex-1 overflow-hidden">
+            <!-- 左侧导航栏 -->
+            <aside class="fixed top-0 left-0 h-full w-full lg:w-[300px] bg-white border-r border-gray-200 shadow-sm lg:shadow-none flex-shrink-0 hidden lg:block overflow-y-auto scrollbar-hide z-10" id="sidebar">
+                <nav class="p-4">
+                    <ul class="space-y-1">
+                        <!-- （一）巡检服务概要 -->
+                        <li class="nav-group">
+                            <div class="nav-item active flex items-center py-2 px-3 rounded-md hover:bg-neutral-light cursor-pointer transition-colors duration-200" data-target="section-1">
+                                <i class="fa fa-tachometer w-5 text-center mr-3 text-primary"></i>
+                                <span>（一）巡检服务概要</span>
+                                <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                            </div>
+                            <ul class="pl-10 mt-1 mb-2 space-y-1 hidden group-active">
+                                <li>
+                                    <a href="#section-1-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库基础情况</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-1-1-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库基本信息</a></li>
+                                        <li><a href="#section-1-1-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">查看数据库的运行状态</a></li>
+                                        <li><a href="#section-1-1-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库重要参数</a></li>
+                                    </ul>
+                                </li>
+                                <li>
+                                    <a href="#section-1-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">存储资源情况</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-1-2-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库容量分析</a></li>
+										<li><a href="#section-1-2-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">所有存储引擎列表</a></li>
+										<li><a href="#section-1-2-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">存储引擎与DB数量关系</a></li>
+                                    </ul>
+                                </li>
+                                <li>
+                                    <a href="#section-1-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">用户信息</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-1-3-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库所有用户</a></li>
+                                    </ul>
+                                </li>
+                                <li>
+                                    <a href="#section-1-4" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">字符集</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-1-4-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">MySQL支持的字符集</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- （二）锁情况 -->
+                        <li class="nav-group">
+                            <div class="nav-item flex items-center py-2 px-3 rounded-md hover:bg-neutral-light cursor-pointer transition-colors duration-200" data-target="section-2">
+                                <i class="fa fa-lock w-5 text-center mr-3 text-primary"></i>
+                                <span>（二）锁情况</span>
+                                <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                            </div>
+                            <ul class="pl-10 mt-1 mb-2 space-y-1 hidden">
+                                <li>
+                                    <a href="#section-2-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">线程检查</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-2-1-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库所有线程</a></li>
+                                        <li><a href="#section-2-1-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">表使用线程数量</a></li>
+                                    </ul>
+                                </li>
+                                <li>
+                                    <a href="#section-2-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">InnoDB锁</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-2-2-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">InnoDB运行时及死锁信息</a></li>
+                                        <li><a href="#section-2-2-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">InnoDB当前锁（锁等待时）</a></li>
+                                        <li><a href="#section-2-2-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">InnoDB锁等待（锁等待时）</a></li>
+                                        <li><a href="#section-2-2-4" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">InnoDB当前活跃事务</a></li>
+                                        <li><a href="#section-2-2-5" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库锁详情</a></li>
+                                    </ul>
+                                </li>
+                                <!-- 其他子项省略，实际使用时需要完整列出 -->
+                                <li>
+                                    <a href="#section-2-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">元数据与服务状态</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-2-3-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">元数据锁的相关信息</a></li>
+                                        <li><a href="#section-2-3-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">服务器的状态</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- （三）SQL性能 -->
+                        <li class="nav-group">
+                            <div class="nav-item flex items-center py-2 px-3 rounded-md hover:bg-neutral-light cursor-pointer transition-colors duration-200" data-target="section-3">
+                                <i class="fa fa-stethoscope w-5 text-center mr-3 text-primary"></i>
+                                <span>（三）SQL性能</span>
+                                <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                            </div>
+                            <ul class="pl-10 mt-1 mb-2 space-y-1 hidden">
+                                <li>
+                                    <a href="#section-3-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">语句执行跟踪</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-3-1-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">长时间操作的进度</a></li>
+                                        <li><a href="#section-3-1-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">当前执行语句进度</a></li>
+                                        <li><a href="#section-3-1-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">已执行语句统计信息</a></li>
+                                    </ul>
+                                </li>
+                                <li>
+                                    <a href="#section-3-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">低效/异常SQL</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-3-2-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">超平均延迟的SQL语句</a></li>
+                                        <li><a href="#section-3-2-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">使用临时表的SQL语句</a></li>
+                                        <li><a href="#section-3-2-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">临时表Top10SQL语句</a></li>
+                                        <li><a href="#section-3-2-4" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">执行文件排序的SQL语句</a></li>
+                                        <li><a href="#section-3-2-5" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">全表扫描的SQL语句</a></li>
+                                        <li><a href="#section-3-2-6" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">全表扫描或索引失效SQL</a></li>
+                                        <li><a href="#section-3-2-7" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">错误或警告的SQL语句</a></li>
+                                    </ul>
+                                </li>
+                                <li>
+                                    <a href="#section-3-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">SQL消耗统计</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-3-3-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">SQL整体消耗百分比</a></li>
+                                        <li><a href="#section-3-3-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">执行次数Top10SQL</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- （四）索引使用情况 -->
+                        <li class="nav-group">
+                            <div class="nav-item flex items-center py-2 px-3 rounded-md hover:bg-neutral-light cursor-pointer transition-colors duration-200" data-target="section-4">
+                                <i class="fa fa-sort-alpha-desc w-5 text-center mr-3 text-primary"></i>
+                                <span>（四）索引使用情况</span>
+                                <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                            </div>
+                            <ul class="pl-10 mt-1 mb-2 space-y-1 hidden">
+                                <li>
+                                    <a href="#section-4-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">索引有效性</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-4-1-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库冗余索引</a></li>
+                                        <li><a href="#section-4-1-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">未使用的无效索引</a></li>
+                                        <li><a href="#section-4-1-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">每张表的索引区分度</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- （五）数据库容灾 -->
+                        <li class="nav-group">
+                            <div class="nav-item flex items-center py-2 px-3 rounded-md hover:bg-neutral-light cursor-pointer transition-colors duration-200" data-target="section-5">
+                                <i class="fa fa-database w-5 text-center mr-3 text-primary"></i>
+                                <span>（五）数据库容灾</span>
+                                <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                            </div>
+                            <ul class="pl-10 mt-1 mb-2 space-y-1 hidden">
+                                <li>
+                                    <a href="#section-5-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">主从运行情况</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-5-1-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">主数据库状态</a></li>
+                                        <li><a href="#section-5-1-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">备数据库状态</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- （六）其它补充检查 -->
+                        <li class="nav-group">
+                            <div class="nav-item flex items-center py-2 px-3 rounded-md hover:bg-neutral-light cursor-pointer transition-colors duration-200" data-target="section-6">
+                                <i class="fa fa-paperclip w-5 text-center mr-3 text-primary"></i>
+                                <span>（六）其它补充检查</span>
+                                <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                            </div>
+                            <ul class="pl-10 mt-1 mb-2 space-y-1 hidden">
+                                <li>
+                                    <a href="#section-6-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">特殊配置</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-6-1-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">setup_consumers配置</a></li>
+                                        <li><a href="#section-6-1-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">自增ID使用情况</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <!-- 移动端导航按钮 -->
+            <button id="mobile-nav-toggle" class="lg:hidden fixed bottom-6 right-6 bg-primary text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center z-50">
+                <i class="fa fa-bars"></i>
+            </button>
+
+            <!-- 右侧内容区域 -->
+            <main class="flex-1 overflow-y-auto main-content bg-gray-50 p-4 lg:p-8" id="content">
+                <!-- 头部信息 -->
+                <header class="bg-primary text-white shadow-lg z-10">
+                    <div class="container mx-auto px-4 py-6 md:py-8">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between">
+                            <div>
+                                <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-shadow">{{description}}数据库巡检报告</h1>
+                                <p class="mt-2 opacity-90">全面数据库性能与健康状况分析</p>
+                            </div>
+                            <div class="mt-4 md:mt-0 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
+                                    <p class="text-xs opacity-80">巡检人</p>
+                                    <p class="font-medium" id="dba-name">Horb.Tao</p>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
+                                    <p class="text-xs opacity-80">巡检时间</p>
+                                    <p class="font-medium" id="inspection-time">{{generated_time}}</p>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 col-span-1 md:col-span-1">
+                                    <p class="text-xs opacity-80">数据库类型</p>
+                                    <p class="font-medium" id="db-name">MySQL</p>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 col-span-1 md:col-span-1">
+                                    <p class="text-xs opacity-80">软件版本</p>
+                                    <p class="font-medium" id="db-version">v1.0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+                <!-- （一）巡检服务概要 -->
+                <section id="section-1" class="mb-12 content-section visible">
+                    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-tachometer text-primary mr-3"></i>
+                            （一）巡检服务概要
+                        </h2>
+                        <p class="text-gray-600">涵盖数据库基础配置、存储资源、引擎、用户及字符集，全面呈现数据库整体状态。</p>
+                    </div>
+
+                    <!-- 基础配置 -->
+                    <div id="section-1-1" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">数据库基础情况</h3>
+
+                        <!-- 数据库基本信息 -->
+                        <div id="section-1-1-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">数据库基本信息</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_0 }
+                            </div>
+                        </div>
+                        <!-- 查看数据库运行状态 -->
+                        <div id="section-1-1-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">查看数据库运行状态</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_1 }
+                            </div>
+                        </div>
+                        <!-- 数据库基本信息 -->
+                        <div id="section-1-1-3" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">数据库重要参数</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_2 }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 存储资源情况 -->
+                    <div id="section-1-2" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">存储资源情况</h3>
+
+                        <!-- 数据库大小 -->
+                        <div id="section-1-2-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">数据库容量分析</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_3 }
+                            </div>
+                            <div id="1-2-1-1" class="invisible" style="display: none;">
+                                { result_4 }
+                            </div>
+                            <div id="1-2-1-2" class="invisible" style="display: none;">
+                                { result_5 }
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] flex justify-center items-center gap-5">
+                                <canvas id="db-size-chart" width="300" height="300"></canvas>
+                                <canvas id="table-size-chart" width="300" height="300"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- 存储引擎信息 -->
+                        <div id="section-1-2-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">存储引擎信息</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_6 }
+                            </div>
+                        </div>
+
+                        <!-- 存储引擎与DB数量关系 -->
+                        <div id="section-1-2-3" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">存储引擎与DB数量关系</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_7 }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 用户信息 -->
+                    <div id="section-1-3" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">用户信息</h3>
+
+                        <!-- 数据库所有用户 -->
+                        <div id="section-1-3-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">数据库所有用户</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_8 }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 字符集 -->
+                    <div id="section-1-4" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">字符集</h3>
+
+                        <!-- MySQL支持的字符集 -->
+                        <div id="section-1-4-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">MySQL支持的字符集</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_9 }
+                            </div>
+                        </div>
+                    </div>
+
+                </section>
+
+                <!-- （二）锁情况 -->
+                <section id="section-2" class="mb-12 content-section visible">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-lock text-primary mr-3"></i>
+                            （二）锁情况
+                        </h2>
+                        <p class="text-gray-600">检查数据库线程、InnoDB锁及元数据锁状态，保障并发与数据一致性</p>
+                    </div>
+                    <!-- 线程检查 -->
+                    <div id="section-2-1" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">线程检查</h3>
+
+                        <!-- 数据库所有线程 -->
+                        <div id="section-2-1-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">数据库所有线程</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_10 }
+                            </div>
+                        </div>
+
+                        <!-- 表使用线程数量 -->
+                        <div id="section-2-1-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">表使用线程数量</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_11 }
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- InnoDB锁 -->
+                    <div id="section-2-2" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">InnoDB锁</h3>
+
+                        <!-- InnoDB运行时及死锁信息 -->
+                        <div id="section-2-2-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">InnoDB运行时及死锁信息</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_12 }
+                            </div>
+                        </div>
+
+                        <!-- InnoDB当前锁（锁等待时） -->
+                        <div id="section-2-2-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">InnoDB当前锁（锁等待时）</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_13 }
+                            </div>
+                        </div>
+
+                        <!-- InnoDB锁等待（锁等待时） -->
+                        <div id="section-2-2-3" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">InnoDB锁等待（锁等待时）</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_14 }
+                            </div>
+                        </div>
+
+                        <!-- InnoDB当前活跃事务 -->
+                        <div id="section-2-2-4" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">InnoDB当前活跃事务</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_15 }
+                            </div>
+                        </div>
+
+                        <!-- 数据库锁详情 -->
+                        <div id="section-2-2-5" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">数据库锁详情</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_16 }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 元数据与服务状态 -->
+                    <div id="section-2-3" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">元数据与服务状态</h3>
+
+                        <!-- 元数据锁相关信息 -->
+                        <div id="section-2-3-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">元数据锁相关信息</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_17 }
+                            </div>
+                        </div>
+
+                         <!-- 数据库服务器状态 -->
+                        <div id="section-2-3-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">数据库服务器状态</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_18 }
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- （三）SQL性能 -->
+                <section id="section-3" class="mb-12 content-section visible">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-stethoscope text-primary mr-3"></i>
+                            （三）SQL性能
+                        </h2>
+                        <p class="text-gray-600">分析SQL执行效率、资源消耗与异常，定位需优化的SQL，提升查询性能</p>
+                    </div>
+                    <!-- 语句执行跟踪 -->
+                    <div id="section-3-1" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">语句执行跟踪</h3>
+
+                        <!-- 长时间操作进度 -->
+                        <div id="section-3-1-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">长时间操作进度</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_19 }
+                            </div>
+                        </div>
+
+                        <!-- 当前执行语句进度 -->
+                        <div id="section-3-1-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">当前执行语句进度</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_20 }
+                            </div>
+                        </div>
+
+                        <!-- 已执行语句统计信息 -->
+                        <div id="section-3-1-3" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">已执行语句统计信息</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_21 }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 低效/异常SQL -->
+                    <div id="section-3-2" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">低效/异常SQL</h3>
+
+                        <!-- 超平均延迟的SQL语句 -->
+                        <div id="section-3-2-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">超平均延迟的SQL语句</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_22 }
+                            </div>
+                        </div>
+
+                        <!-- 使用临时表的SQL语句 -->
+                        <div id="section-3-2-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">使用临时表的SQL语句</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_23 }
+                            </div>
+                        </div>
+
+                        <!-- 临时表Top10SQL语句 -->
+                        <div id="section-3-2-3" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">临时表Top10SQL语句</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_24 }
+                            </div>
+                        </div>
+
+                        <!-- 执行文件排序的SQL语句 -->
+                        <div id="section-3-2-4" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">执行文件排序的SQL语句</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_25 }
+                            </div>
+                        </div>
+
+                        <!-- 全表扫描的SQL语句 -->
+                        <div id="section-3-2-5" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">全表扫描的SQL语句</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_26 }
+                            </div>
+                        </div>
+
+                        <!-- 全表扫描或索引失效SQL -->
+                        <div id="section-3-2-6" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">全表扫描或索引失效SQL</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_27 }
+                            </div>
+                        </div>
+
+                        <!-- 错误或警告的SQL语句 -->
+                        <div id="section-3-2-7" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">错误或警告的SQL语句</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_28 }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SQL消耗统计 -->
+                    <div id="section-3-3" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">SQL消耗统计</h3>
+
+                        <!-- SQL整体消耗百分比 -->
+                        <div id="section-3-3-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">SQL整体消耗百分比</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_29 }
+                            </div>
+                        </div>
+
+                        <!-- 执行次数Top10SQL -->
+                        <div id="section-3-3-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">执行次数Top10SQL</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_30 }
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- （四）索引情况 -->
+                <section id="section-4" class="mb-12 content-section visible">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-sort-alpha-desc text-primary mr-3"></i>
+                            （四）索引情况
+                        </h2>
+                        <p class="text-gray-600">检查索引有效性，排查冗余、无效索引，确保索引提升查询效率</p>
+                    </div>
+                    <!-- 段情况 -->
+                    <div id="section-4-1" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">索引有效性</h3>
+
+                        <!-- 数据库冗余索引 -->
+                        <div id="section-4-1-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">数据库冗余索引</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_31 }
+                            </div>
+                        </div>
+
+                        <!-- 未使用的无效索引 -->
+                        <div id="section-4-1-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">未使用的无效索引</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_32 }
+                            </div>
+                        </div>
+
+                        <!-- 每张表的索引区分度 -->
+                        <div id="section-4-1-3" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">每张表的索引区分度</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_33 }
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- （五）数据库容灾 -->
+                <section id="section-5" class="mb-12 content-section visible">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-database text-primary mr-3"></i>
+                            （五）数据库容灾
+                        </h2>
+                        <p class="text-gray-600">检查主从复制架构中主库与备库的状态，保障主备数据同步及高可用性</p>
+                    </div>
+                    <!-- 主备状态 -->
+                    <div id="section-5-1" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">主备状态</h3>
+
+                        <!-- 主数据库状态检查 -->
+                        <div id="section-5-1-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">主数据库状态</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_34 }
+                            </div>
+                        </div>
+
+                        <!-- 备数据库状态检查 -->
+                        <div id="section-5-1-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">备数据库状态</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_35 }
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- （六）其它补充检查 -->
+                <section id="section-6" class="mb-12 content-section visible">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-paperclip text-primary mr-3"></i>
+                            （六）其它补充检查
+                        </h2>
+                        <p class="text-gray-600">补充检查数据库特殊配置项，关注如自增ID使用等关键配置的合理性</p>
+                    </div>
+                    <!-- 特殊配置 -->
+                    <div id="section-6-1" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">特殊配置</h3>
+
+                        <!-- setup_consumers配置 -->
+                        <div id="section-6-1-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">setup_consumers配置</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_36 }
+                            </div>
+                        </div>
+
+                        <!-- 自增ID使用情况 -->
+                        <div id="section-6-1-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">自增ID使用情况</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_37 }
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- 引入Chart.js（本地优先） -->
+    <script src="../report_template/libs/chart.umd.min.js"
+            onerror="this.remove(); const cdnScript = document.createElement('script'); cdnScript.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js'; document.head.appendChild(cdnScript);">
+    </script>
+    <script>
+        // 导航菜单展开/折叠功能
+        document.addEventListener('DOMContentLoaded', function() {
+            // 导航组点击事件
+            const navGroupHeaders = document.querySelectorAll('.nav-group > div.nav-item');
+            navGroupHeaders.forEach(header => {
+                header.addEventListener('click', function() {
+                    const group = this.parentElement;
+                    const submenu = group.querySelector('ul');
+                    const icon = this.querySelector('.fa-chevron-down');
+
+                    // 切换子菜单显示状态
+                    submenu.classList.toggle('hidden');
+                    // 旋转图标
+                    icon.style.transform = submenu.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+                });
+            });
+
+            // 默认展开第一个导航组
+            const firstGroup = document.querySelector('.nav-group');
+            if (firstGroup) {
+                const firstSubmenu = firstGroup.querySelector('ul');
+                const firstIcon = firstGroup.querySelector('.fa-chevron-down');
+                firstSubmenu.classList.remove('hidden');
+                firstIcon.style.transform = 'rotate(180deg)';
+            }
+
+            // 导航项点击事件 - 更新激活状态
+            const navItems = document.querySelectorAll('.nav-item a, .nav-group > div.nav-item');
+            navItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    // 移除所有激活状态
+                    document.querySelectorAll('.nav-item').forEach(navItem => {
+                        navItem.classList.remove('active');
+                    });
+
+                    // 添加当前项激活状态
+                    this.classList.add('active');
+                });
+            });
+
+            // 移动端导航切换
+            const mobileNavToggle = document.getElementById('mobile-nav-toggle');
+            const sidebar = document.getElementById('sidebar');
+
+            mobileNavToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('hidden');
+                sidebar.classList.toggle('fixed');
+                sidebar.classList.toggle('inset-0');
+                sidebar.classList.toggle('z-40');
+                sidebar.classList.toggle('lg:static');
+                sidebar.classList.toggle('lg:inset-auto');
+
+                // 切换图标
+                const icon = this.querySelector('i');
+                if (icon.classList.contains('fa-bars')) {
+                    icon.classList.remove('fa-bars');
+                    icon.classList.add('fa-times');
+                } else {
+                    icon.classList.remove('fa-times');
+                    icon.classList.add('fa-bars');
+                }
+            });
+
+            // 滚动时显示内容区块动画
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px',
+                threshold: 0.1
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.content-section').forEach(section => {
+                observer.observe(section);
+            });
+
+            // 新增：自动生成颜色的函数（根据数据条数动态生成差异化颜色）
+            function generateDynamicColors(dataLength) {
+                const colors = [];
+                const hueStep = 360 / dataLength; // 按数据条数均分色相环（0-360°）
+                for (let i = 0; i < dataLength; i++) {
+                    // 使用HSL颜色：色相循环、饱和度70%（鲜艳）、亮度50%（适中）
+                    const hue = i * hueStep;
+                    colors.push(`hsl(${hue}, 70%, 50%)`);
+                }
+                return colors;
+            }
+
+            // 1. 获取表格数据（div-id为1-2-1-1中的表格）
+            const tableContainer0 = document.getElementById('1-2-1-1');
+            const table0 = tableContainer0.querySelector('table');
+
+            // 收集标签（第一列：table_schema）和数据（第二列：db_size）
+            const labels0 = [];
+            const data0 = [];
+
+            // 从第二行开始读取数据（第一行是表头）
+            for (let i = 1; i < table0.rows.length; i++) {
+                const row = table0.rows[i];
+                // 第一列作为标签（c）
+                labels0.push(row.cells[0].textContent.trim());
+                // 第二列作为数据（db_size）
+                data0.push(parseFloat(row.cells[1].textContent.trim()));
+            }
+
+            // 2. 生成环形图
+            const ctx0 = document.getElementById('db-size-chart').getContext('2d');
+
+            // 替换为自动生成的颜色（根据labels1的长度动态生成）
+            const backgroundColors0 = generateDynamicColors(labels0.length);
+            new Chart(ctx0, {
+                type: 'doughnut',
+                data: {
+                    labels: labels0,  // 使用查询到的第一列（db_size）作为标签
+                    datasets: [{
+                        data: data0,     // 使用查询到的第二列（db_size）作为数据
+                        backgroundColor: backgroundColors0,  // 自动适配数据量的颜色
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'left',  // 左侧显示图例（避免标签过多时重叠）
+                            labels: {
+                                boxWidth: 12,
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.raw} GB`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+
+            // 1. 获取表格数据（div-id为1-2-1-2中的表格）
+            const tableContainer1 = document.getElementById('1-2-1-2');
+            const table1 = tableContainer1.querySelector('table');
+
+            // 收集标签（第一列：table_name）和数据（第二列：table_size）
+            const labels1 = [];
+            const data1 = [];
+
+            // 从第二行开始读取数据（第一行是表头）
+            for (let i = 1; i < table1.rows.length; i++) {
+                const row = table1.rows[i];
+                // 第一列作为标签（owner）
+                labels1.push(row.cells[0].textContent.trim());
+                // 第二列作为数据（seg_size）
+                data1.push(parseFloat(row.cells[1].textContent.trim()));
+            }
+
+            // 2. 生成环形图
+            const ctx1 = document.getElementById('table-size-chart').getContext('2d');
+
+            // 替换为自动生成的颜色（根据labels1的长度动态生成）
+            const backgroundColors1 = generateDynamicColors(labels1.length);
+            new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: labels1,  // 使用查询到的第一列（owner）作为标签
+                    datasets: [{
+                        data: data1,     // 使用查询到的第二列（seg_size）作为数据
+                        backgroundColor: backgroundColors1,  // 自动适配数据量的颜色
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',  // 右侧显示图例（避免标签过多时重叠）
+                            labels: {
+                                boxWidth: 12,
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.raw} GB`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+
+            // 更新当前时间
+            const now = new Date();
+            const formattedTime = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            // document.getElementById('inspection-time').textContent = formattedTime;
+        });
+    </script>
+</body>
+</html>

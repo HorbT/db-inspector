@@ -1,0 +1,16 @@
+export declare const APP_NAME = "DB Inspector";
+export declare const APP_VERSION = "1.0.0";
+export declare const DEFAULT_RESULT_PATH = "inspection_results";
+export declare const DEFAULT_QUERY_TIMEOUT = 300;
+export declare const PYTHON_BRIDGE_TIMEOUT = 30000;
+export declare const PYTHON_STARTUP_TIMEOUT = 10000;
+export declare const SUPPORTED_DB_TYPES: readonly ["mysql", "oracle", "sqlserver", "tidb"];
+export type DBType = (typeof SUPPORTED_DB_TYPES)[number];
+export declare const DB_TYPE_LABELS: Record<DBType, string>;
+export declare const DB_TYPE_ICONS: Record<DBType, string>;
+export declare const PLUGIN_MANIFEST_PATH = "plugins";
+export declare const RESOURCES_BASE_PATH = "resources/dbinspection";
+export declare const CONNECTION_ENCRYPTION_KEY_FILE = "encryption_key.key";
+export declare const CONNECTION_STORE_FILE = "connections.enc";
+export declare const CONFIG_STORE_FILE = "db_inspector_config.json";
+export declare const AI_CONFIG_STORE_FILE = "db_inspector_ai_config.json";

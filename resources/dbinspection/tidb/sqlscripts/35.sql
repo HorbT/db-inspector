@@ -1,0 +1,1 @@
+show stats_healthy where Healthy<=60;

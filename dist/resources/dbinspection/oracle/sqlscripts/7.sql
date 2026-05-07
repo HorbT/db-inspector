@@ -1,0 +1,27 @@
+SELECT P.CON_ID,
+       DECODE(p.isdefault,
+              'FALSE',
+              SUBSTR(p.name, 0, 512),
+              SUBSTR(p.name, 0, 512)) pname,
+       DECODE(p.isdefault,
+              'FALSE',
+              i.instance_name,
+              i.instance_name) instance_name_print,
+       DECODE(p.isdefault,
+              'FALSE',
+              SUBSTR(p.value, 0, 512),
+              SUBSTR(p.value, 0, 512)) value,
+       p.DISPLAY_VALUE,
+       DECODE(p.isdefault,
+              'FALSE',
+              p.isdefault,
+              p.isdefault) isdefault,
+       DECODE(p.isdefault,
+              'FALSE',
+              p.issys_modifiable,
+              p.issys_modifiable) issys_modifiable,
+       p.ISDEPRECATED,
+       p.DESCRIPTION
+  FROM gv$parameter p, gv$instance i
+ WHERE p.inst_id = i.inst_id
+ ORDER BY p.name, i.instance_name;

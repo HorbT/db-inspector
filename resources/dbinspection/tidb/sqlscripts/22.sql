@@ -1,0 +1,1 @@
+select instance, count(*) counts from information_schema.cluster_slow_query  group by instance
