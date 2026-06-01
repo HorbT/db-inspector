@@ -66,6 +66,7 @@ module.exports = {
           fg: 'hsl(var(--sidebar-fg))',
           hover: 'hsl(var(--sidebar-hover))',
           active: 'hsl(var(--sidebar-active))',
+          'active-fg': 'hsl(var(--sidebar-active-fg))',
         },
         success: 'hsl(var(--success))',
         warning: 'hsl(var(--warning))',

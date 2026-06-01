@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{description}} StarRocks数据库巡检报告</title>
+    <!-- 引入Tailwind CSS（本地优先） -->
+    <script src="../report_template/libs/tailwindcss.min.js"
+            onerror="this.remove(); const cdnScript = document.createElement('script'); cdnScript.src='https://cdn.tailwindcss.com'; document.head.appendChild(cdnScript);">
+    </script>
+
+    <!-- 引入Font Awesome（本地优先） -->
+    <link href="../report_template/libs/font-awesome/css/font-awesome.min.css"
+          rel="stylesheet"
+          onerror="this.remove(); const cdnLink = document.createElement('link'); cdnLink.rel='stylesheet'; cdnLink.href='https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css'; document.head.appendChild(cdnLink);">
+
+    <!-- 配置Tailwind自定义颜色和字体 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        accent: '#722ED1',
+                        neutral: '#F2F3F5',
+                        'neutral-dark': '#4E5969',
+                        'neutral-light': '#F7F8FA',
+                        success: '#52C41A',
+                        warning: '#FAAD14',
+                        danger: '#FF4D4F',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['Consolas', 'Monaco', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- 自定义工具类 -->
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .transition-transform-opacity {
+                transition-property: transform, opacity;
+            }
+
+            /* 表格全局样式 */
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 1rem 0;
+                font-size: 0.875rem;
+            }
+
+            /* 表头样式 */
+            table th {
+                background-color: theme('colors.neutral-light');
+                color: theme('colors.neutral-dark');
+                font-weight: 600;
+                text-align: left;
+                padding: 0.75rem 1rem;
+                border: 1px solid theme('colors.neutral');
+            }
+
+            /* 单元格样式 */
+            table td {
+                padding: 0.75rem 1rem;
+                border: 1px solid theme('colors.neutral');
+                color: theme('colors.gray-800');
+            }
+
+            /* 行悬停效果 */
+            table tr:hover {
+                background-color: theme('colors.secondary/0.5');
+                transition: background-color 0.2s ease;
+            }
+
+            /* 响应式处理：小屏幕下表格横向滚动 */
+            .result-section {
+                overflow-x: auto;
+                margin: 1rem 0;
+            }
+
+            .result-section table {
+                table-layout: auto;
+                width: auto;
+                min-width: 100%;
+            }
+
+            /* 表头与单元格通用样式 */
+            .result-section th,.result-section td {
+                overflow-wrap: break-word;
+                padding: 8px 12px;
+                vertical-align: top;
+            }
+        }
+    </style>
+
+    <style>
+        /* 平滑滚动 */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* 导航激活项动画 */
+        .nav-item.active {
+            position: relative;
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background-color: #165DFF;
+            transition: all 0.3s ease;
+        }
+
+        .main-content {
+            margin-left: 0;
+        }
+
+        @media (min-width: 1024px) {
+            .main-content {
+                margin-left: 300px;
+            }
+        }
+
+        /* 内容区块淡入动画 */
+        .content-section {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .content-section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 antialiased">
+    <div class="flex flex-col lg:flex-row min-h-screen">
+        <div class="flex flex-1 overflow-hidden">
+            <!-- 左侧导航栏 -->
+            <aside class="fixed top-0 left-0 h-full w-full lg:w-[300px] bg-white border-r border-gray-200 shadow-sm lg:shadow-none flex-shrink-0 hidden lg:block overflow-y-auto scrollbar-hide z-10" id="sidebar">
+                <nav class="p-4">
+                    <ul class="space-y-1">
+                        <!-- （一）集群基础信息 -->
+                        <li class="nav-group">
+                            <div class="nav-item active flex items-center py-2 px-3 rounded-md hover:bg-neutral-light cursor-pointer transition-colors duration-200" data-target="section-1">
+                                <i class="fa fa-server w-5 text-center mr-3 text-primary"></i>
+                                <span>（一）集群基础信息</span>
+                                <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                            </div>
+                            <ul class="pl-10 mt-1 mb-2 space-y-1 hidden group-active">
+                                <li>
+                                    <a href="#section-1-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库基本信息</a>
+                                </li>
+                                <li>
+                                    <a href="#section-1-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">集群节点拓扑</a>
+                                    <ul class="pl-6 mt-1 space-y-1">
+                                        <li><a href="#section-1-2-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">FE节点（Frontend）</a></li>
+                                        <li><a href="#section-1-2-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">BE节点（Backend）</a></li>
+                                        <li><a href="#section-1-2-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">Compute节点</a></li>
+                                        <li><a href="#section-1-2-4" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">Broker节点</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- （二）集群运行状态 -->
+                        <li class="nav-group">
+                            <div class="nav-item flex items-center py-2 px-3 rounded-md hover:bg-neutral-light cursor-pointer transition-colors duration-200" data-target="section-2">
+                                <i class="fa fa-heartbeat w-5 text-center mr-3 text-primary"></i>
+                                <span>（二）集群运行状态</span>
+                                <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                            </div>
+                            <ul class="pl-10 mt-1 mb-2 space-y-1 hidden">
+                                <li><a href="#section-2-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">集群元信息</a></li>
+                                <li><a href="#section-2-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">集群均衡状态</a></li>
+                                <li><a href="#section-2-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">全局当前查询</a></li>
+                                <li><a href="#section-2-4" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库进程列表</a></li>
+                                <li><a href="#section-2-5" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">FE锁信息</a></li>
+                            </ul>
+                        </li>
+
+                        <!-- （三）系统配置与权限 -->
+                        <li class="nav-group">
+                            <div class="nav-item flex items-center py-2 px-3 rounded-md hover:bg-neutral-light cursor-pointer transition-colors duration-200" data-target="section-3">
+                                <i class="fa fa-cogs w-5 text-center mr-3 text-primary"></i>
+                                <span>（三）系统配置与权限</span>
+                                <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                            </div>
+                            <ul class="pl-10 mt-1 mb-2 space-y-1 hidden">
+                                <li><a href="#section-3-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">字符集</a></li>
+                                <li><a href="#section-3-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">全局变量</a></li>
+                                <li><a href="#section-3-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库用户信息</a></li>
+                            </ul>
+                        </li>
+
+                        <!-- （四）数据资产概览 -->
+                        <li class="nav-group">
+                            <div class="nav-item flex items-center py-2 px-3 rounded-md hover:bg-neutral-light cursor-pointer transition-colors duration-200" data-target="section-4">
+                                <i class="fa fa-pie-chart w-5 text-center mr-3 text-primary"></i>
+                                <span>（四）数据资产概览</span>
+                                <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                            </div>
+                            <ul class="pl-10 mt-1 mb-2 space-y-1 hidden">
+                                <li><a href="#section-4-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库容量分析</a></li>
+                                <li><a href="#section-4-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">数据库对象分类统计</a></li>
+                                <li><a href="#section-4-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">大表TOP10</a></li>
+                                <li><a href="#section-4-4" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">存储引擎分布</a></li>
+                            </ul>
+                        </li>
+
+                        <!-- （五）数据任务管理 -->
+                        <li class="nav-group">
+                            <div class="nav-item flex items-center py-2 px-3 rounded-md hover:bg-neutral-light cursor-pointer transition-colors duration-200" data-target="section-5">
+                                <i class="fa fa-tasks w-5 text-center mr-3 text-primary"></i>
+                                <span>（五）数据任务管理</span>
+                                <i class="fa fa-chevron-down ml-auto text-xs transition-transform duration-300"></i>
+                            </div>
+                            <ul class="pl-10 mt-1 mb-2 space-y-1 hidden">
+                                <li><a href="#section-5-1" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">导入任务汇总</a></li>
+                                <li><a href="#section-5-2" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">失败导入任务</a></li>
+                                <li><a href="#section-5-3" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">物化视图</a></li>
+                                <li><a href="#section-5-4" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">备份任务</a></li>
+                                <li><a href="#section-5-5" class="nav-item flex items-center py-1.5 px-3 rounded-md hover:bg-neutral-light text-sm cursor-pointer transition-colors duration-200">恢复任务</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <!-- 移动端导航按钮 -->
+            <button id="mobile-nav-toggle" class="lg:hidden fixed bottom-6 right-6 bg-primary text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center z-50">
+                <i class="fa fa-bars"></i>
+            </button>
+
+            <!-- 右侧内容区域 -->
+            <main class="flex-1 overflow-y-auto main-content bg-gray-50 p-4 lg:p-8" id="content">
+                <!-- 头部信息 -->
+                <header class="bg-primary text-white shadow-lg z-10">
+                    <div class="container mx-auto px-4 py-6 md:py-8">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between">
+                            <div>
+                                <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-shadow">{{description}}StarRocks数据库巡检报告</h1>
+                                <p class="mt-2 opacity-90">全面数据库性能与健康状况分析</p>
+                            </div>
+                            <div class="mt-4 md:mt-0 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
+                                    <p class="text-xs opacity-80">巡检人</p>
+                                    <p class="font-medium" id="dba-name">Horb.Tao</p>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
+                                    <p class="text-xs opacity-80">巡检时间</p>
+                                    <p class="font-medium" id="inspection-time">{{generated_time}}</p>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 col-span-1 md:col-span-1">
+                                    <p class="text-xs opacity-80">数据库类型</p>
+                                    <p class="font-medium" id="db-name">StarRocks</p>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 col-span-1 md:col-span-1">
+                                    <p class="text-xs opacity-80">软件版本</p>
+                                    <p class="font-medium" id="db-version">v1.0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- （一）集群基础信息 -->
+                <section id="section-1" class="mb-12 content-section visible">
+                    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-server text-primary mr-3"></i>
+                            （一）集群基础信息
+                        </h2>
+                        <p class="text-gray-600">涵盖数据库会话、版本信息以及FE/BE/Compute/Broker各类节点的拓扑情况，全面呈现集群基础配置。</p>
+                    </div>
+
+                    <!-- 数据库基本信息 -->
+                    <div id="section-1-1" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">数据库基本信息</h3>
+
+                        <div class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">会话与版本信息</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_0 }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 集群节点拓扑 -->
+                    <div id="section-1-2" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">集群节点拓扑</h3>
+
+                        <!-- FE节点 -->
+                        <div id="section-1-2-1" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">FE节点（Frontend）</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_1 }
+                            </div>
+                        </div>
+
+                        <!-- BE节点 -->
+                        <div id="section-1-2-2" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">BE节点（Backend）</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_2 }
+                            </div>
+                        </div>
+
+                        <!-- Compute节点 -->
+                        <div id="section-1-2-3" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">Compute节点</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_3 }
+                            </div>
+                        </div>
+
+                        <!-- Broker节点 -->
+                        <div id="section-1-2-4" class="mb-8">
+                            <h4 class="text-lg font-medium text-gray-700 mb-3">Broker节点</h4>
+                            <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                                { result_4 }
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- （二）集群运行状态 -->
+                <section id="section-2" class="mb-12 content-section visible">
+                    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-heartbeat text-primary mr-3"></i>
+                            （二）集群运行状态
+                        </h2>
+                        <p class="text-gray-600">监控集群运行时状态，包含元信息、均衡状态、当前查询、进程列表及FE锁信息。</p>
+                    </div>
+
+                    <!-- 集群元信息 -->
+                    <div id="section-2-1" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">集群元信息</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_5 }
+                        </div>
+                    </div>
+
+                    <!-- 集群均衡状态 -->
+                    <div id="section-2-2" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">集群均衡状态</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_6 }
+                        </div>
+                    </div>
+
+                    <!-- 全局当前查询 -->
+                    <div id="section-2-3" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">全局当前查询</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_7 }
+                        </div>
+                    </div>
+
+                    <!-- 数据库进程列表 -->
+                    <div id="section-2-4" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">数据库进程列表</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_8 }
+                        </div>
+                    </div>
+
+                    <!-- FE锁信息 -->
+                    <div id="section-2-5" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">FE锁信息</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[600px] width-auto">
+                            { result_9 }
+                        </div>
+                    </div>
+                </section>
+
+                <!-- （三）系统配置与权限 -->
+                <section id="section-3" class="mb-12 content-section visible">
+                    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-cogs text-primary mr-3"></i>
+                            （三）系统配置与权限
+                        </h2>
+                        <p class="text-gray-600">检查数据库字符集、全局参数配置以及用户权限信息，确保系统配置合理且安全。</p>
+                    </div>
+
+                    <!-- 字符集 -->
+                    <div id="section-3-1" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">字符集</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_10 }
+                        </div>
+                    </div>
+
+                    <!-- 全局变量 -->
+                    <div id="section-3-2" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">全局变量</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_11 }
+                        </div>
+                    </div>
+
+                    <!-- 数据库用户信息 -->
+                    <div id="section-3-3" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">数据库用户信息</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_12 }
+                        </div>
+                    </div>
+                </section>
+
+                <!-- （四）数据资产概览 -->
+                <section id="section-4" class="mb-12 content-section visible">
+                    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-pie-chart text-primary mr-3"></i>
+                            （四）数据资产概览
+                        </h2>
+                        <p class="text-gray-600">盘点数据库容量分布、对象分类统计、大表排行及存储引擎使用情况，全面掌握数据资产现状。</p>
+                    </div>
+
+                    <!-- 数据库容量分析 -->
+                    <div id="section-4-1" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">数据库容量分析</h3>
+
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_13 }
+                        </div>
+
+                        <!-- 可视化图表：数据库容量分布 -->
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto flex flex-col lg:flex-row justify-center items-center gap-5">
+                            <div class="flex flex-col items-center">
+                                <h5 class="text-base font-medium text-gray-700 mb-2">各数据库数据大小分布 (MB)</h5>
+                                <canvas id="db-size-chart" width="350" height="350"></canvas>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <h5 class="text-base font-medium text-gray-700 mb-2">各数据库表行数对比</h5>
+                                <canvas id="db-rows-chart" width="350" height="350"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 数据库对象分类统计 -->
+                    <div id="section-4-2" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">数据库对象分类统计</h3>
+
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_14 }
+                        </div>
+
+                        <!-- 可视化图表：对象类型分布 -->
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto flex justify-center items-center">
+                            <div class="flex flex-col items-center w-full max-w-2xl">
+                                <h5 class="text-base font-medium text-gray-700 mb-2">各数据库对象类型分布</h5>
+                                <canvas id="object-type-chart" width="500" height="350"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 大表TOP10 -->
+                    <div id="section-4-3" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">大表TOP10</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_15 }
+                        </div>
+                    </div>
+
+                    <!-- 存储引擎分布 -->
+                    <div id="section-4-4" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">存储引擎分布</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_16 }
+                        </div>
+                    </div>
+                </section>
+
+                <!-- （五）数据任务管理 -->
+                <section id="section-5" class="mb-12 content-section visible">
+                    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa fa-tasks text-primary mr-3"></i>
+                            （五）数据任务管理
+                        </h2>
+                        <p class="text-gray-600">监控数据导入、物化视图刷新、备份与恢复等任务的执行情况，确保数据流转正常。</p>
+                    </div>
+
+                    <!-- 导入任务汇总 -->
+                    <div id="section-5-1" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">导入任务汇总（最近24小时）</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_17 }
+                        </div>
+                    </div>
+
+                    <!-- 失败导入任务 -->
+                    <div id="section-5-2" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">失败导入任务（最近24小时）</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_18 }
+                        </div>
+                    </div>
+
+                    <!-- 物化视图 -->
+                    <div id="section-5-3" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">物化视图</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_19 }
+                        </div>
+                    </div>
+
+                    <!-- 备份任务 -->
+                    <div id="section-5-4" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">备份任务</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_20 }
+                        </div>
+                    </div>
+
+                    <!-- 恢复任务 -->
+                    <div id="section-5-5" class="bg-white rounded-xl shadow-sm p-6 mb-8 content-section">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-l-4 border-primary pl-3">恢复任务</h3>
+                        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto overflow-y-auto max-h-[400px] width-auto">
+                            { result_21 }
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- 引入Chart.js（本地优先） -->
+    <script src="../report_template/libs/chart.umd.min.js"
+            onerror="this.remove(); const cdnScript = document.createElement('script'); cdnScript.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js'; document.head.appendChild(cdnScript);">
+    </script>
+    <script>
+        // 导航菜单展开/折叠功能
+        document.addEventListener('DOMContentLoaded', function() {
+            // 导航组点击事件
+            const navGroupHeaders = document.querySelectorAll('.nav-group > div.nav-item');
+            navGroupHeaders.forEach(header => {
+                header.addEventListener('click', function() {
+                    const group = this.parentElement;
+                    const submenu = group.querySelector('ul');
+                    const icon = this.querySelector('.fa-chevron-down');
+
+                    // 切换子菜单显示状态
+                    submenu.classList.toggle('hidden');
+                    // 旋转图标
+                    icon.style.transform = submenu.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+                });
+            });
+
+            // 默认展开第一个导航组
+            const firstGroup = document.querySelector('.nav-group');
+            if (firstGroup) {
+                const firstSubmenu = firstGroup.querySelector('ul');
+                const firstIcon = firstGroup.querySelector('.fa-chevron-down');
+                firstSubmenu.classList.remove('hidden');
+                firstIcon.style.transform = 'rotate(180deg)';
+            }
+
+            // 导航项点击事件 - 更新激活状态
+            const navItems = document.querySelectorAll('.nav-item a, .nav-group > div.nav-item');
+            navItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    // 移除所有激活状态
+                    document.querySelectorAll('.nav-item').forEach(navItem => {
+                        navItem.classList.remove('active');
+                    });
+
+                    // 添加当前项激活状态
+                    this.classList.add('active');
+                });
+            });
+
+            // 移动端导航切换
+            const mobileNavToggle = document.getElementById('mobile-nav-toggle');
+            const sidebar = document.getElementById('sidebar');
+
+            mobileNavToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('hidden');
+                sidebar.classList.toggle('fixed');
+                sidebar.classList.toggle('inset-0');
+                sidebar.classList.toggle('z-40');
+                sidebar.classList.toggle('lg:static');
+                sidebar.classList.toggle('lg:inset-auto');
+
+                // 切换图标
+                const icon = this.querySelector('i');
+                if (icon.classList.contains('fa-bars')) {
+                    icon.classList.remove('fa-bars');
+                    icon.classList.add('fa-times');
+                } else {
+                    icon.classList.remove('fa-times');
+                    icon.classList.add('fa-bars');
+                }
+            });
+
+            // 滚动时显示内容区块动画
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px',
+                threshold: 0.1
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.content-section').forEach(section => {
+                observer.observe(section);
+            });
+
+            // 自动生成颜色的函数（根据数据条数动态生成差异化颜色）
+            function generateDynamicColors(dataLength) {
+                const colors = [];
+                const hueStep = 360 / dataLength;
+                for (let i = 0; i < dataLength; i++) {
+                    const hue = i * hueStep;
+                    colors.push(`hsl(${hue}, 70%, 50%)`);
+                }
+                return colors;
+            }
+
+            // 解析HTML表格数据为{labels, data}的通用函数
+            // labelColIndex: 标签列索引(0-based), dataColIndex: 数据列索引(0-based)
+            function parseTableData(table, labelColIndex, dataColIndex) {
+                const labels = [];
+                const data = [];
+                for (let i = 1; i < table.rows.length; i++) {
+                    const row = table.rows[i];
+                    const labelCell = row.cells[labelColIndex];
+                    const dataCell = row.cells[dataColIndex];
+                    if (labelCell && dataCell) {
+                        labels.push(labelCell.textContent.trim());
+                        data.push(parseFloat(dataCell.textContent.trim()) || 0);
+                    }
+                }
+                return { labels, data };
+            }
+
+            // ========== 图表1：各数据库数据大小分布（环形图） ==========
+            // result_13 返回列: SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME,
+            //                   table_rows, data_size_mb, index_size_mb, all_size_mb, max_size_mb, free_size_mb
+            (function() {
+                const section4_1 = document.getElementById('section-4-1');
+                const table = section4_1.querySelector('table');
+                if (!table) return;
+
+                const { labels, data } = parseTableData(table, 0, 6); // SCHEMA_NAME(col 0) → all_size_mb(col 6)
+
+                if (labels.length === 0) return;
+
+                const ctx = document.getElementById('db-size-chart').getContext('2d');
+                const backgroundColors = generateDynamicColors(labels.length);
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: backgroundColors,
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'left',
+                                labels: {
+                                    boxWidth: 12,
+                                    padding: 15
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.label}: ${context.raw} MB`;
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '60%'
+                    }
+                });
+            })();
+
+            // ========== 图表2：各数据库表行数对比（柱状图） ==========
+            (function() {
+                const section4_1 = document.getElementById('section-4-1');
+                const table = section4_1.querySelector('table');
+                if (!table) return;
+
+                const { labels, data } = parseTableData(table, 0, 3); // SCHEMA_NAME(col 0) → table_rows(col 3)
+
+                if (labels.length === 0) return;
+
+                const ctx = document.getElementById('db-rows-chart').getContext('2d');
+                const backgroundColors = generateDynamicColors(labels.length);
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '表行数',
+                            data: data,
+                            backgroundColor: backgroundColors,
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        indexAxis: 'y',
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.label}: ${context.raw.toLocaleString()} 行`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        if (value >= 1000000000) return (value / 1000000000).toFixed(1) + 'B';
+                                        if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                                        if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
+                                        return value;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            })();
+
+            // ========== 图表3：各数据库对象类型分布（分组柱状图） ==========
+            // result_14 返回列: db_name, ob_type, sums
+            (function() {
+                const section4_2 = document.getElementById('section-4-2');
+                const table = section4_2.querySelector('table');
+                if (!table) return;
+
+                // 将数据按 db_name 分组，每个 ob_type 为一个 dataset
+                const dbMap = {};  // { db_name: { ob_type: sums } }
+                const typeSet = new Set();
+                const dbOrder = [];
+
+                for (let i = 1; i < table.rows.length; i++) {
+                    const row = table.rows[i];
+                    const dbName = row.cells[0] ? row.cells[0].textContent.trim() : '';
+                    const obType = row.cells[1] ? row.cells[1].textContent.trim() : '';
+                    const sums = row.cells[2] ? parseInt(row.cells[2].textContent.trim()) || 0 : 0;
+
+                    if (!dbName || !obType) continue;
+
+                    if (!dbMap[dbName]) {
+                        dbMap[dbName] = {};
+                        dbOrder.push(dbName);
+                    }
+                    dbMap[dbName][obType] = sums;
+                    typeSet.add(obType);
+                }
+
+                if (dbOrder.length === 0) return;
+
+                const types = Array.from(typeSet).sort();
+                const typeColors = generateDynamicColors(types.length);
+                const colorMap = {};
+                types.forEach((t, i) => { colorMap[t] = typeColors[i]; });
+
+                const datasets = types.map(type => ({
+                    label: type,
+                    data: dbOrder.map(db => dbMap[db][type] || 0),
+                    backgroundColor: colorMap[type],
+                    borderWidth: 0
+                }));
+
+                const ctx = document.getElementById('object-type-chart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: dbOrder,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    boxWidth: 12,
+                                    padding: 10
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.raw} 个`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                stacked: false,
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 0
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                stacked: false,
+                                ticks: {
+                                    stepSize: 1,
+                                    callback: function(value) {
+                                        if (Number.isInteger(value)) return value;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            })();
+        });
+    </script>
+</body>
+</html>

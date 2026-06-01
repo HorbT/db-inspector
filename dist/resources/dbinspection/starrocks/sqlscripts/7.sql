@@ -1,0 +1,1 @@
+SHOW PROC '/global_current_queries';

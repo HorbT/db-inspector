@@ -16,6 +16,7 @@ from plugins.mysql_plugin import MySQLPlugin
 from plugins.oracle_plugin import OraclePlugin
 from plugins.sqlserver_plugin import SQLServerPlugin
 from plugins.tidb_plugin import TiDBPlugin
+from plugins.starrocks_plugin import StarRocksPlugin
 
 
 class Server:
@@ -33,6 +34,7 @@ class Server:
             'oracle': OraclePlugin,
             'sqlserver': SQLServerPlugin,
             'tidb': TiDBPlugin,
+            'starrocks': StarRocksPlugin,
         }
         for db_type, plugin_cls in plugin_classes.items():
             try:

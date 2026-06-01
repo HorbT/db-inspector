@@ -7,18 +7,20 @@ exports.DEFAULT_RESULT_PATH = 'inspection_results';
 exports.DEFAULT_QUERY_TIMEOUT = 300; // seconds
 exports.PYTHON_BRIDGE_TIMEOUT = 30000; // ms
 exports.PYTHON_STARTUP_TIMEOUT = 10000; // ms
-exports.SUPPORTED_DB_TYPES = ['mysql', 'oracle', 'sqlserver', 'tidb'];
+exports.SUPPORTED_DB_TYPES = ['mysql', 'oracle', 'sqlserver', 'tidb', 'starrocks'];
 exports.DB_TYPE_LABELS = {
     mysql: 'MySQL',
     oracle: 'Oracle',
     sqlserver: 'SQL Server',
     tidb: 'TiDB',
+    starrocks: 'StarRocks',
 };
 exports.DB_TYPE_ICONS = {
     mysql: 'database',
     oracle: 'database-zap',
     sqlserver: 'server',
     tidb: 'database',
+    starrocks: 'database',
 };
 exports.PLUGIN_MANIFEST_PATH = 'plugins';
 exports.RESOURCES_BASE_PATH = 'resources/dbinspection';

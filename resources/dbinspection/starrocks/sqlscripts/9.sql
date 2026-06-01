@@ -1,0 +1,1 @@
+select lock_type as 锁类型,lock_object as 锁对象,lock_mode as 锁模式,start_time as 开始时间,hold_time_ms as 持续时间,thread_info as 线程信息,granted as 是否被授予,waiter_list as 等待队列 from sys.fe_locks

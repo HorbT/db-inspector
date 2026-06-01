@@ -4,7 +4,7 @@ export declare const DEFAULT_RESULT_PATH = "inspection_results";
 export declare const DEFAULT_QUERY_TIMEOUT = 300;
 export declare const PYTHON_BRIDGE_TIMEOUT = 30000;
 export declare const PYTHON_STARTUP_TIMEOUT = 10000;
-export declare const SUPPORTED_DB_TYPES: readonly ["mysql", "oracle", "sqlserver", "tidb"];
+export declare const SUPPORTED_DB_TYPES: readonly ["mysql", "oracle", "sqlserver", "tidb", "starrocks"];
 export type DBType = (typeof SUPPORTED_DB_TYPES)[number];
 export declare const DB_TYPE_LABELS: Record<DBType, string>;
 export declare const DB_TYPE_ICONS: Record<DBType, string>;

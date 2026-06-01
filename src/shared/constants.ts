@@ -8,7 +8,7 @@ export const DEFAULT_QUERY_TIMEOUT = 300; // seconds
 export const PYTHON_BRIDGE_TIMEOUT = 30000; // ms
 export const PYTHON_STARTUP_TIMEOUT = 10000; // ms
 
-export const SUPPORTED_DB_TYPES = ['mysql', 'oracle', 'sqlserver', 'tidb'] as const;
+export const SUPPORTED_DB_TYPES = ['mysql', 'oracle', 'sqlserver', 'tidb', 'starrocks'] as const;
 export type DBType = (typeof SUPPORTED_DB_TYPES)[number];
 
 export const DB_TYPE_LABELS: Record<DBType, string> = {
@@ -16,6 +16,7 @@ export const DB_TYPE_LABELS: Record<DBType, string> = {
   oracle: 'Oracle',
   sqlserver: 'SQL Server',
   tidb: 'TiDB',
+  starrocks: 'StarRocks',
 };
 
 export const DB_TYPE_ICONS: Record<DBType, string> = {
@@ -23,6 +24,7 @@ export const DB_TYPE_ICONS: Record<DBType, string> = {
   oracle: 'database-zap',
   sqlserver: 'server',
   tidb: 'database',
+  starrocks: 'database',
 };
 
 export const PLUGIN_MANIFEST_PATH = 'plugins';
