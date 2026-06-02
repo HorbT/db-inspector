@@ -82,9 +82,24 @@ export interface InspectionResult {
   dbType: string;
   success: boolean;
   reportPath?: string;
+  dbPath?: string;
   error?: string;
   completedAt: string;
   results: QueryResult[];
+  serverInfo?: string;
+  total?: number;
+  errorCount?: number;
+}
+
+export interface InspectionResultItem {
+  connectionId: string;
+  fileNum: number;
+  fileName: string;
+  section?: string;
+  columns?: string[];
+  rows?: (string | number | null)[][];
+  rowCount?: number;
+  error?: string;
 }
 
 // ==================== Report Types ====================
@@ -97,6 +112,7 @@ export interface ReportMeta {
   description: string;
   createdAt: string;
   fileSize: number;
+  dbId?: string;
 }
 
 export interface ReportFilter {
@@ -155,6 +171,7 @@ export const IPC_CHANNELS = {
   INSPECTION_CANCEL: 'inspection:cancel',
   INSPECTION_PROGRESS: 'inspection:progress',
   INSPECTION_RESULT: 'inspection:result',
+  INSPECTION_RESULT_ITEM: 'inspection:result-item',
 
   // Report channels
   REPORT_LIST: 'report:list',

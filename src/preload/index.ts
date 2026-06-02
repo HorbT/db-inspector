@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
   ConnectionConfig, ConnectionTestResult, InspectionConfig,
-  InspectionProgress, InspectionResult, ReportMeta, ReportFilter,
+  InspectionProgress, InspectionResult, InspectionResultItem, ReportMeta, ReportFilter,
   AIConfig, AIAnalysisResult, AppConfig, PluginManifest
 } from '@shared/types';
 
@@ -35,6 +35,11 @@ const electronAPI = {
     ipcRenderer.on('inspection:result', handler);
     return () => ipcRenderer.removeListener('inspection:result', handler);
   },
+  onInspectionResultItem: (callback: (item: InspectionResultItem) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, item: InspectionResultItem) => callback(item);
+    ipcRenderer.on('inspection:result-item', handler);
+    return () => ipcRenderer.removeListener('inspection:result-item', handler);
+  },
 
   // Report operations
   listReports: (filter?: ReportFilter): Promise<ReportMeta[]> =>
@@ -47,6 +52,14 @@ const electronAPI = {
     ipcRenderer.invoke('report:export-pdf', filePath),
   compareReports: (path1: string, path2: string): Promise<string> =>
     ipcRenderer.invoke('report:compare', path1, path2),
+  fetchReportMeta: (dbPath: string): Promise<Record<string, string> | null> =>
+    ipcRenderer.invoke('report:read-db-meta', dbPath),
+  fetchReportResults: (dbPath: string): Promise<unknown[]> =>
+    ipcRenderer.invoke('report:read-db-results', dbPath),
+  renderReportHtml: (dbPath: string): Promise<string> =>
+    ipcRenderer.invoke('report:render-db-to-html', dbPath),
+  exportReportHtml: (dbPath: string): Promise<{ success: boolean; outputPath?: string; error?: string }> =>
+    ipcRenderer.invoke('report:export-db-to-html', dbPath),
 
   // Config operations
   loadConfig: (): Promise<AppConfig> =>

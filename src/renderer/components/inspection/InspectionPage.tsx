@@ -5,7 +5,7 @@ import { ConnectionList } from '../connection/ConnectionList';
 import { ConnectionForm } from '../connection/ConnectionForm';
 import { ProgressLog } from './ProgressLog';
 import { AIAnalysisDialog } from './AIAnalysisDialog';
-import type { InspectionProgress, InspectionResult } from '@shared/types';
+import type { InspectionProgress, InspectionResult, InspectionResultItem } from '@shared/types';
 
 export function InspectionPage(): React.ReactElement {
   const { selectedConnectionIds } = useConnectionStore();
@@ -23,7 +23,6 @@ export function InspectionPage(): React.ReactElement {
     const unsubProgress = window.electronAPI.onInspectionProgress((progress: InspectionProgress) => {
       addProgress(progress);
       if (progress.debugInfo) {
-        // Debug mode: show raw debug info
         const level = progress.debugInfo.includes('失败') || progress.debugInfo.includes('错误')
           ? 'error' : progress.debugInfo.includes('成功')
           ? 'success' : progress.debugInfo.includes('跳过')
@@ -34,26 +33,28 @@ export function InspectionPage(): React.ReactElement {
       }
     });
 
+    const unsubResultItem = window.electronAPI.onInspectionResultItem((item: InspectionResultItem) => {
+      if (item.error) {
+        addLog(`[${item.fileName}] 失败: ${item.error}`, 'error');
+      } else {
+        addLog(`[${item.fileName}] 完成 (${item.columns?.length || 0}列, ${item.rowCount ?? 0}行)`, 'success');
+      }
+    });
+
     const unsubResult = window.electronAPI.onInspectionResult((result: InspectionResult) => {
       addResult(result);
       hasResults.current = true;
       if (result.success) {
-        addLog(`[${result.description}] 巡检完成，报告: ${result.reportPath || 'N/A'}`, 'success');
-        if (result.reportPath) {
-          setLatestReport({
-            path: result.reportPath,
-            name: result.reportPath.split(/[\\/]/).pop() || result.reportPath,
-          });
-        }
+        addLog(`[${result.description}] 巡检完成`, 'success');
       } else {
         addLog(`[${result.description}] 巡检失败: ${result.error}`, 'error');
       }
-      // Reset debug mode after inspection completes
       setIsDebugMode(false);
     });
 
     return () => {
       unsubProgress();
+      unsubResultItem();
       unsubResult();
     };
   }, []);

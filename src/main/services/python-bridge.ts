@@ -6,6 +6,12 @@ import type { JsonRpcRequest, JsonRpcResponse } from '@shared/types';
 const PYTHON_BRIDGE_TIMEOUT = 7200000;
 const PYTHON_STARTUP_TIMEOUT = 10000;
 
+export interface InspectionEventCallbacks {
+  debug: ((line: string) => void) | null;
+  result: ((payload: Record<string, unknown>) => void) | null;
+  complete: ((payload: Record<string, unknown>) => void) | null;
+}
+
 export class PythonBridge {
   private static instance: PythonBridge;
   private process: ChildProcess | null = null;
@@ -15,12 +21,18 @@ export class PythonBridge {
   private isRunning = false;
   private startPromise: Promise<void> | null = null;
   private debugCallback: ((line: string) => void) | null = null;
+  private inspectionCallbacks: InspectionEventCallbacks | null = null;
 
   private constructor() {}
 
   /** Register a callback for real-time debug lines from Python stderr */
   onDebugLine(callback: ((line: string) => void) | null): void {
     this.debugCallback = callback;
+  }
+
+  /** Register callbacks for real-time inspection events (result/complete) from Python stderr */
+  onInspectionEvent(callbacks: InspectionEventCallbacks | null): void {
+    this.inspectionCallbacks = callbacks;
   }
 
   static getInstance(): PythonBridge {
@@ -87,12 +99,28 @@ export class PythonBridge {
 
         this.process.stderr?.on('data', (data: Buffer) => {
           const text = data.toString('utf-8');
-          // Forward debug lines to the callback in real-time
+          // Forward debug/result/complete lines to callbacks in real-time
           const lines = text.split('\n');
           for (const line of lines) {
             const trimmed = line.trim();
+            if (!trimmed) continue;
+
             if (trimmed.startsWith('[DBG]') && this.debugCallback) {
               this.debugCallback(trimmed.substring(5).trim());
+            } else if (trimmed.startsWith('[RSLT]') && this.inspectionCallbacks?.result) {
+              try {
+                const payload = JSON.parse(trimmed.substring(6).trim());
+                this.inspectionCallbacks.result(payload);
+              } catch {
+                console.error('[PythonBridge] Failed to parse RSLT:', trimmed);
+              }
+            } else if (trimmed.startsWith('[DONE]') && this.inspectionCallbacks?.complete) {
+              try {
+                const payload = JSON.parse(trimmed.substring(6).trim());
+                this.inspectionCallbacks.complete(payload);
+              } catch {
+                console.error('[PythonBridge] Failed to parse DONE:', trimmed);
+              }
             } else if (trimmed) {
               console.error('[PythonBridge stderr]', trimmed);
             }

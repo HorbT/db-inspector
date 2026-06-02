@@ -4,6 +4,7 @@ import { AIAnalysisDialog } from '../inspection/AIAnalysisDialog';
 import { SUPPORTED_DB_TYPES, DB_TYPE_LABELS } from '@shared/constants';
 import type { DBType } from '@shared/constants';
 import type { ReportMeta } from '@shared/types';
+import { ReportViewer } from './ReportViewer';
 
 export function ReportPage(): React.ReactElement {
   const {
@@ -41,6 +42,20 @@ export function ReportPage(): React.ReactElement {
 
   const handleAIAnalyze = (report: ReportMeta) => {
     setAnalyzeReport(report);
+  };
+
+  const handleSaveReport = async (report: ReportMeta) => {
+    try {
+      const result = await window.electronAPI.exportReportHtml(report.filePath);
+      if (result.success) {
+        alert(`报告已保存至: ${result.outputPath}`);
+        loadReports(filter);
+      } else {
+        alert(`保存失败: ${result.error}`);
+      }
+    } catch (err) {
+      alert(`保存失败: ${(err as Error).message}`);
+    }
   };
 
   return (
@@ -162,24 +177,53 @@ export function ReportPage(): React.ReactElement {
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-sm">报告预览</h2>
             {selectedReport && (
-              <button
-                onClick={() => handleAIAnalyze(selectedReport)}
-                className="btn-primary text-xs h-7 px-3 flex items-center gap-1.5"
-                title="AI分析当前报告"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                  <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                </svg>
-                AI分析
-              </button>
+              <div className="flex gap-2">
+                {selectedReport.filePath.endsWith('.db') && (
+                  <button
+                    onClick={() => handleSaveReport(selectedReport)}
+                    className="btn-primary text-xs h-7 px-3 flex items-center gap-1.5"
+                    title="保存为HTML报告"
+                  >
+                    保存报告
+                  </button>
+                )}
+                <button
+                  onClick={() => handleAIAnalyze(selectedReport)}
+                  className="btn-secondary text-xs h-7 px-3 flex items-center gap-1.5"
+                  title="AI分析当前报告"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                  </svg>
+                  AI分析
+                </button>
+              </div>
             )}
           </div>
           {selectedReport ? (
-            <iframe
-              src={`file:///${selectedReport.filePath.replace(/\\/g, '/')}`}
-              className="w-full h-[calc(100%-2rem)] border rounded"
-              title="报告预览"
-            />
+            selectedReport.filePath.endsWith('.db') ? (
+              <div className="w-full h-[calc(100%-2rem)] overflow-auto">
+                <ReportViewer dbPath={selectedReport.filePath} />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                <p className="text-gray-500 mb-2">旧版 HTML 报告</p>
+                <p className="text-gray-400 text-sm mb-4">此报告为旧版本生成的完整 HTML 文件，不支持实时查看。</p>
+                <button
+                  onClick={() => {
+                    const url = `file:///${selectedReport.filePath.replace(/\\/g, '/')}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="bg-primary text-white px-4 py-2 rounded text-sm hover:bg-primary/90 transition-colors"
+                >
+                  在浏览器中打开
+                </button>
+              </div>
+            )
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <p className="text-sm">请选择一个报告查看</p>

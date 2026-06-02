@@ -1,10 +1,13 @@
 import { ipcMain } from 'electron';
 import path from 'path';
+import fs from 'fs';
 import { IPC_CHANNELS } from '@shared/types';
 import { SUPPORTED_DB_TYPES } from '@shared/constants';
 import type { ReportFilter } from '@shared/types';
 import type { ConfigStore } from '../services/config-store';
 import { FileManager } from '../services/file-manager';
+import { ReportDB } from '../services/report-db';
+import { exportDbToHtml, renderDbToHtml } from '../services/report-exporter';
 
 export function registerReportHandlers(configStore: ConfigStore): void {
   ipcMain.handle(IPC_CHANNELS.REPORT_LIST, (_event, filter?: ReportFilter) => {
@@ -82,5 +85,56 @@ export function registerReportHandlers(configStore: ConfigStore): void {
     }
     // Return both contents for the renderer to handle comparison
     return JSON.stringify({ report1: content1, report2: content2 });
+  });
+
+  // SQLite-based report reading
+  ipcMain.handle('report:read-db-meta', async (_event, dbPath: string) => {
+    if (!fs.existsSync(dbPath)) return null;
+    const db = new ReportDB(dbPath);
+    try {
+      const meta = await db.getMeta();
+      return Object.fromEntries(meta);
+    } finally {
+      await db.close();
+    }
+  });
+
+  ipcMain.handle('report:read-db-results', async (_event, dbPath: string) => {
+    if (!fs.existsSync(dbPath)) return [];
+    const db = new ReportDB(dbPath);
+    try {
+      return await db.getAllResults();
+    } finally {
+      await db.close();
+    }
+  });
+
+  // Render .db report to HTML string (for in-app preview)
+  ipcMain.handle('report:render-db-to-html', async (_event, dbPath: string) => {
+    if (!fs.existsSync(dbPath)) {
+      throw new Error(`报告文件不存在: ${dbPath}`);
+    }
+    const db = new ReportDB(dbPath);
+    try {
+      return await renderDbToHtml(db, dbPath);
+    } finally {
+      await db.close();
+    }
+  });
+
+  // Export .db report to HTML
+  ipcMain.handle('report:export-db-to-html', async (_event, dbPath: string) => {
+    if (!fs.existsSync(dbPath)) {
+      throw new Error(`报告文件不存在: ${dbPath}`);
+    }
+    const db = new ReportDB(dbPath);
+    try {
+      const htmlPath = await exportDbToHtml(db, dbPath);
+      return { success: true, outputPath: htmlPath };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    } finally {
+      await db.close();
+    }
   });
 }

@@ -3,6 +3,7 @@ import path from 'path';
 import { app } from 'electron';
 import type { ReportMeta, ReportFilter, PluginManifest } from '@shared/types';
 import { SUPPORTED_DB_TYPES, RESOURCES_BASE_PATH } from '@shared/constants';
+import { ReportDB } from './report-db';
 
 export class FileManager {
   static getResourcesPath(): string {
@@ -76,14 +77,14 @@ export class FileManager {
     return manifests;
   }
 
-  static listReports(resultPath: string, filter?: ReportFilter): ReportMeta[] {
+  static async listReports(resultPath: string, filter?: ReportFilter): Promise<ReportMeta[]> {
     if (!fs.existsSync(resultPath)) return [];
 
     try {
       const reports: ReportMeta[] = [];
 
-      // Recursively scan resultPath for HTML report files
-      this._scanReportsRecursive(resultPath, resultPath, reports);
+      // Recursively scan resultPath for HTML and DB report files
+      await this._scanReportsRecursive(resultPath, resultPath, reports);
 
       // Apply filters
       const filtered = reports.filter((r) => {
@@ -108,7 +109,7 @@ export class FileManager {
     }
   }
 
-  private static _scanReportsRecursive(basePath: string, dirPath: string, reports: ReportMeta[]): void {
+  private static async _scanReportsRecursive(basePath: string, dirPath: string, reports: ReportMeta[]): Promise<void> {
     if (!fs.existsSync(dirPath)) return;
 
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -118,7 +119,7 @@ export class FileManager {
 
       if (entry.isDirectory()) {
         // Recurse into subdirectories
-        this._scanReportsRecursive(basePath, fullPath, reports);
+        await this._scanReportsRecursive(basePath, fullPath, reports);
       } else if (entry.isFile() && entry.name.endsWith('.html')) {
         const stat = fs.statSync(fullPath);
 
@@ -161,6 +162,33 @@ export class FileManager {
           createdAt: stat.mtime.toISOString(),
           fileSize: stat.size,
         });
+      } else if (entry.isFile() && entry.name.endsWith('.db')) {
+        // SQLite-based inspection report
+        const stat = fs.statSync(fullPath);
+        try {
+          const db = new ReportDB(fullPath);
+          const meta = await db.getMeta();
+          await db.close();
+
+          const dbType = meta.get('db_type') || 'unknown';
+          const description = meta.get('description') || entry.name.replace('.db', '');
+          const generatedTime = meta.get('generated_time') || '';
+          const dbId = path.basename(fullPath, '.db');
+
+          reports.push({
+            id: Buffer.from(fullPath).toString('base64'),
+            fileName: `${description}_${dbId}.db`,
+            filePath: fullPath,
+            dbType,
+            description,
+            createdAt: generatedTime ? new Date(generatedTime).toISOString() : stat.mtime.toISOString(),
+            fileSize: stat.size,
+            dbId,
+          });
+        } catch {
+          // Corrupted or inaccessible db, skip
+          console.error('[FileManager] Failed to read inspection db:', fullPath);
+        }
       }
     }
   }
