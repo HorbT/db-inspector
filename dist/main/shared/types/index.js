@@ -17,6 +17,7 @@ exports.IPC_CHANNELS = {
     INSPECTION_CANCEL: 'inspection:cancel',
     INSPECTION_PROGRESS: 'inspection:progress',
     INSPECTION_RESULT: 'inspection:result',
+    INSPECTION_RESULT_ITEM: 'inspection:result-item',
     // Report channels
     REPORT_LIST: 'report:list',
     REPORT_DELETE: 'report:delete',

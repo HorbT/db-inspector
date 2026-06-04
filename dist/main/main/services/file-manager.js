@@ -8,6 +8,7 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const electron_1 = require("electron");
 const constants_1 = require("../../shared/constants");
+const report_db_1 = require("./report-db");
 class FileManager {
     static getResourcesPath() {
         if (electron_1.app.isPackaged) {
@@ -72,13 +73,13 @@ class FileManager {
         }
         return manifests;
     }
-    static listReports(resultPath, filter) {
+    static async listReports(resultPath, filter) {
         if (!fs_1.default.existsSync(resultPath))
             return [];
         try {
             const reports = [];
-            // Recursively scan resultPath for HTML report files
-            this._scanReportsRecursive(resultPath, resultPath, reports);
+            // Recursively scan resultPath for HTML and DB report files
+            await this._scanReportsRecursive(resultPath, resultPath, reports);
             // Apply filters
             const filtered = reports.filter((r) => {
                 if (filter) {
@@ -105,7 +106,7 @@ class FileManager {
             return [];
         }
     }
-    static _scanReportsRecursive(basePath, dirPath, reports) {
+    static async _scanReportsRecursive(basePath, dirPath, reports) {
         if (!fs_1.default.existsSync(dirPath))
             return;
         const entries = fs_1.default.readdirSync(dirPath, { withFileTypes: true });
@@ -113,7 +114,7 @@ class FileManager {
             const fullPath = path_1.default.join(dirPath, entry.name);
             if (entry.isDirectory()) {
                 // Recurse into subdirectories
-                this._scanReportsRecursive(basePath, fullPath, reports);
+                await this._scanReportsRecursive(basePath, fullPath, reports);
             }
             else if (entry.isFile() && entry.name.endsWith('.html')) {
                 const stat = fs_1.default.statSync(fullPath);
@@ -155,6 +156,33 @@ class FileManager {
                     createdAt: stat.mtime.toISOString(),
                     fileSize: stat.size,
                 });
+            }
+            else if (entry.isFile() && entry.name.endsWith('.db')) {
+                // SQLite-based inspection report
+                const stat = fs_1.default.statSync(fullPath);
+                try {
+                    const db = new report_db_1.ReportDB(fullPath);
+                    const meta = await db.getMeta();
+                    await db.close();
+                    const dbType = meta.get('db_type') || 'unknown';
+                    const description = meta.get('description') || entry.name.replace('.db', '');
+                    const generatedTime = meta.get('generated_time') || '';
+                    const dbId = path_1.default.basename(fullPath, '.db');
+                    reports.push({
+                        id: Buffer.from(fullPath).toString('base64'),
+                        fileName: `${description}_${dbId}.db`,
+                        filePath: fullPath,
+                        dbType,
+                        description,
+                        createdAt: generatedTime ? new Date(generatedTime).toISOString() : stat.mtime.toISOString(),
+                        fileSize: stat.size,
+                        dbId,
+                    });
+                }
+                catch {
+                    // Corrupted or inaccessible db, skip
+                    console.error('[FileManager] Failed to read inspection db:', fullPath);
+                }
             }
         }
     }

@@ -6,9 +6,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerReportHandlers = registerReportHandlers;
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const types_1 = require("../../shared/types");
 const constants_1 = require("../../shared/constants");
 const file_manager_1 = require("../services/file-manager");
+const report_db_1 = require("../services/report-db");
+const report_exporter_1 = require("../services/report-exporter");
 function registerReportHandlers(configStore) {
     electron_1.ipcMain.handle(types_1.IPC_CHANNELS.REPORT_LIST, (_event, filter) => {
         const resultPath = configStore.getResultPath();
@@ -75,6 +78,60 @@ function registerReportHandlers(configStore) {
         }
         // Return both contents for the renderer to handle comparison
         return JSON.stringify({ report1: content1, report2: content2 });
+    });
+    // SQLite-based report reading
+    electron_1.ipcMain.handle('report:read-db-meta', async (_event, dbPath) => {
+        if (!fs_1.default.existsSync(dbPath))
+            return null;
+        const db = new report_db_1.ReportDB(dbPath);
+        try {
+            const meta = await db.getMeta();
+            return Object.fromEntries(meta);
+        }
+        finally {
+            await db.close();
+        }
+    });
+    electron_1.ipcMain.handle('report:read-db-results', async (_event, dbPath) => {
+        if (!fs_1.default.existsSync(dbPath))
+            return [];
+        const db = new report_db_1.ReportDB(dbPath);
+        try {
+            return await db.getAllResults();
+        }
+        finally {
+            await db.close();
+        }
+    });
+    // Render .db report to HTML string (for in-app preview)
+    electron_1.ipcMain.handle('report:render-db-to-html', async (_event, dbPath) => {
+        if (!fs_1.default.existsSync(dbPath)) {
+            throw new Error(`报告文件不存在: ${dbPath}`);
+        }
+        const db = new report_db_1.ReportDB(dbPath);
+        try {
+            return await (0, report_exporter_1.renderDbToHtml)(db, dbPath);
+        }
+        finally {
+            await db.close();
+        }
+    });
+    // Export .db report to HTML
+    electron_1.ipcMain.handle('report:export-db-to-html', async (_event, dbPath) => {
+        if (!fs_1.default.existsSync(dbPath)) {
+            throw new Error(`报告文件不存在: ${dbPath}`);
+        }
+        const db = new report_db_1.ReportDB(dbPath);
+        try {
+            const htmlPath = await (0, report_exporter_1.exportDbToHtml)(db, dbPath);
+            return { success: true, outputPath: htmlPath };
+        }
+        catch (err) {
+            return { success: false, error: err.message };
+        }
+        finally {
+            await db.close();
+        }
     });
 }
 //# sourceMappingURL=report.ipc.js.map

@@ -22,12 +22,21 @@ const electronAPI = {
         electron_1.ipcRenderer.on('inspection:result', handler);
         return () => electron_1.ipcRenderer.removeListener('inspection:result', handler);
     },
+    onInspectionResultItem: (callback) => {
+        const handler = (_event, item) => callback(item);
+        electron_1.ipcRenderer.on('inspection:result-item', handler);
+        return () => electron_1.ipcRenderer.removeListener('inspection:result-item', handler);
+    },
     // Report operations
     listReports: (filter) => electron_1.ipcRenderer.invoke('report:list', filter),
     deleteReports: (ids) => electron_1.ipcRenderer.invoke('report:delete', ids),
     readReport: (filePath) => electron_1.ipcRenderer.invoke('report:read', filePath),
     exportReportPdf: (filePath) => electron_1.ipcRenderer.invoke('report:export-pdf', filePath),
     compareReports: (path1, path2) => electron_1.ipcRenderer.invoke('report:compare', path1, path2),
+    fetchReportMeta: (dbPath) => electron_1.ipcRenderer.invoke('report:read-db-meta', dbPath),
+    fetchReportResults: (dbPath) => electron_1.ipcRenderer.invoke('report:read-db-results', dbPath),
+    renderReportHtml: (dbPath) => electron_1.ipcRenderer.invoke('report:render-db-to-html', dbPath),
+    exportReportHtml: (dbPath) => electron_1.ipcRenderer.invoke('report:export-db-to-html', dbPath),
     // Config operations
     loadConfig: () => electron_1.ipcRenderer.invoke('config:load'),
     saveConfig: (config) => electron_1.ipcRenderer.invoke('config:save', config),

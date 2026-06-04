@@ -18,10 +18,15 @@ class PythonBridge {
         this.isRunning = false;
         this.startPromise = null;
         this.debugCallback = null;
+        this.inspectionCallbacks = null;
     }
     /** Register a callback for real-time debug lines from Python stderr */
     onDebugLine(callback) {
         this.debugCallback = callback;
+    }
+    /** Register callbacks for real-time inspection events (result/complete) from Python stderr */
+    onInspectionEvent(callbacks) {
+        this.inspectionCallbacks = callbacks;
     }
     static getInstance() {
         if (!PythonBridge.instance) {
@@ -79,12 +84,32 @@ class PythonBridge {
                 });
                 this.process.stderr?.on('data', (data) => {
                     const text = data.toString('utf-8');
-                    // Forward debug lines to the callback in real-time
+                    // Forward debug/result/complete lines to callbacks in real-time
                     const lines = text.split('\n');
                     for (const line of lines) {
                         const trimmed = line.trim();
+                        if (!trimmed)
+                            continue;
                         if (trimmed.startsWith('[DBG]') && this.debugCallback) {
                             this.debugCallback(trimmed.substring(5).trim());
+                        }
+                        else if (trimmed.startsWith('[RSLT]') && this.inspectionCallbacks?.result) {
+                            try {
+                                const payload = JSON.parse(trimmed.substring(6).trim());
+                                this.inspectionCallbacks.result(payload);
+                            }
+                            catch {
+                                console.error('[PythonBridge] Failed to parse RSLT:', trimmed);
+                            }
+                        }
+                        else if (trimmed.startsWith('[DONE]') && this.inspectionCallbacks?.complete) {
+                            try {
+                                const payload = JSON.parse(trimmed.substring(6).trim());
+                                this.inspectionCallbacks.complete(payload);
+                            }
+                            catch {
+                                console.error('[PythonBridge] Failed to parse DONE:', trimmed);
+                            }
                         }
                         else if (trimmed) {
                             console.error('[PythonBridge stderr]', trimmed);

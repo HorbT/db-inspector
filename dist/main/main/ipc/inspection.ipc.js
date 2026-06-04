@@ -9,6 +9,8 @@ const path_1 = __importDefault(require("path"));
 const types_1 = require("../../shared/types");
 const python_bridge_1 = require("../services/python-bridge");
 const file_manager_1 = require("../services/file-manager");
+const report_db_1 = require("../services/report-db");
+const lgwr_buffer_1 = require("../services/lgwr-buffer");
 let currentInspectionCancelled = false;
 function registerInspectionHandlers(configStore) {
     const pythonBridge = python_bridge_1.PythonBridge.getInstance();
@@ -31,21 +33,6 @@ function registerInspectionHandlers(configStore) {
             }
             const mainWindow = electron_1.BrowserWindow.getFocusedWindow();
             const isDebug = config.debug === true;
-            // Register real-time debug callback on PythonBridge
-            if (isDebug) {
-                pythonBridge.onDebugLine((line) => {
-                    const progress = {
-                        connectionId: '',
-                        description: '',
-                        currentIndex: 0,
-                        total: 0,
-                        currentScript: line,
-                        status: 'running',
-                        debugInfo: line,
-                    };
-                    mainWindow?.webContents.send(types_1.IPC_CHANNELS.INSPECTION_PROGRESS, progress);
-                });
-            }
             try {
                 // Process inspections one by one
                 for (let i = 0; i < selectedConnections.length; i++) {
@@ -62,9 +49,68 @@ function registerInspectionHandlers(configStore) {
                     };
                     mainWindow?.webContents.send(types_1.IPC_CHANNELS.INSPECTION_PROGRESS, progress);
                     try {
-                        // Save reports in dbType-specific subfolder
+                        // Create db-specific result directory and SQLite database
                         const dbResultPath = path_1.default.join(baseResultPath, conn.dbType);
                         file_manager_1.FileManager.ensureDir(dbResultPath);
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                        const dbFileName = `${conn.description}_${timestamp}.db`;
+                        const dbPath = path_1.default.join(dbResultPath, dbFileName);
+                        const reportDB = new report_db_1.ReportDB(dbPath);
+                        const lgwr = new lgwr_buffer_1.LgwrBuffer(reportDB);
+                        // Store meta info
+                        await reportDB.setMetaBatch([
+                            { key: 'db_type', value: conn.dbType },
+                            { key: 'description', value: conn.description },
+                            { key: 'generated_time', value: new Date().toLocaleString('zh-CN') },
+                            { key: 'db_name', value: conn.database || '' },
+                            { key: 'host', value: conn.host },
+                            { key: 'port', value: String(conn.port) },
+                        ]);
+                        // Register callbacks for real-time events from Python stderr
+                        pythonBridge.onInspectionEvent({
+                            debug: isDebug
+                                ? (line) => {
+                                    const dp = {
+                                        connectionId: conn.id,
+                                        description: conn.description,
+                                        currentIndex: i + 1,
+                                        total: selectedConnections.length,
+                                        currentScript: line,
+                                        status: 'running',
+                                        debugInfo: line,
+                                    };
+                                    mainWindow?.webContents.send(types_1.IPC_CHANNELS.INSPECTION_PROGRESS, dp);
+                                }
+                                : null,
+                            result: (payload) => {
+                                const item = {
+                                    connectionId: conn.id,
+                                    fileNum: payload.fileNum,
+                                    fileName: payload.fileName,
+                                    section: payload.section || '',
+                                    columns: payload.columns,
+                                    rows: payload.rows,
+                                    rowCount: payload.rowCount,
+                                    error: payload.error,
+                                };
+                                // Write to SQLite for persistence (fire-and-forget, don't block)
+                                lgwr.push({
+                                    fileNum: item.fileNum,
+                                    fileName: item.fileName,
+                                    section: item.section,
+                                    columns: item.columns,
+                                    rows: item.rows,
+                                    error: item.error,
+                                }).catch(err => console.error('[Inspection IPC] LgwrBuffer push error:', err));
+                                // Send to renderer for real-time display
+                                mainWindow?.webContents.send(types_1.IPC_CHANNELS.INSPECTION_RESULT_ITEM, item);
+                            },
+                            complete: (payload) => {
+                                const status = payload.status === 'completed' ? 'completed' : 'failed';
+                                lgwr.finalize(status, payload.total)
+                                    .catch(err => console.error('[Inspection IPC] LgwrBuffer finalize error:', err));
+                            },
+                        });
                         // Start inspection on Python side (2-hour timeout for large SQL sets)
                         const result = await pythonBridge.call('inspection.execute', {
                             connectionId: conn.id,
@@ -81,8 +127,27 @@ function registerInspectionHandlers(configStore) {
                             reportTemplateLibsDir: file_manager_1.FileManager.getReportTemplateLibsDir(conn.dbType),
                             queryTimeout: config.queryTimeout,
                             debug: isDebug,
-                        }, 7200000); // 2 hours for large SQL sets
-                        mainWindow?.webContents.send(types_1.IPC_CHANNELS.INSPECTION_RESULT, result);
+                        }, 7200000);
+                        // Store server info if available
+                        if (result.serverInfo) {
+                            await reportDB.setMeta('server_info', result.serverInfo);
+                        }
+                        await lgwr.finalize(result.success ? 'completed' : 'failed');
+                        await reportDB.close();
+                        const inspectionResult = {
+                            connectionId: conn.id,
+                            description: conn.description,
+                            dbType: conn.dbType,
+                            success: result.success,
+                            dbPath,
+                            error: result.error,
+                            completedAt: new Date().toISOString(),
+                            results: [],
+                            serverInfo: result.serverInfo,
+                            total: result.total,
+                            errorCount: result.errorCount,
+                        };
+                        mainWindow?.webContents.send(types_1.IPC_CHANNELS.INSPECTION_RESULT, inspectionResult);
                     }
                     catch (err) {
                         const errorResult = {
@@ -99,8 +164,8 @@ function registerInspectionHandlers(configStore) {
                 }
             }
             finally {
-                // Always clean up debug callback
-                pythonBridge.onDebugLine(null);
+                // Always clean up callbacks
+                pythonBridge.onInspectionEvent(null);
             }
             return true;
         }

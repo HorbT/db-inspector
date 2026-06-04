@@ -1,4 +1,4 @@
-import type { ConnectionConfig, ConnectionTestResult, InspectionConfig, InspectionProgress, InspectionResult, ReportMeta, ReportFilter, AIConfig, AIAnalysisResult, AppConfig, PluginManifest } from '../shared/types';
+import type { ConnectionConfig, ConnectionTestResult, InspectionConfig, InspectionProgress, InspectionResult, InspectionResultItem, ReportMeta, ReportFilter, AIConfig, AIAnalysisResult, AppConfig, PluginManifest } from '../shared/types';
 declare const electronAPI: {
     listConnections: () => Promise<ConnectionConfig[]>;
     addConnection: (config: ConnectionConfig) => Promise<{
@@ -19,6 +19,7 @@ declare const electronAPI: {
     cancelInspection: () => Promise<boolean>;
     onInspectionProgress: (callback: (progress: InspectionProgress) => void) => (() => void);
     onInspectionResult: (callback: (result: InspectionResult) => void) => (() => void);
+    onInspectionResultItem: (callback: (item: InspectionResultItem) => void) => (() => void);
     listReports: (filter?: ReportFilter) => Promise<ReportMeta[]>;
     deleteReports: (ids: string[]) => Promise<{
         success: boolean;
@@ -30,6 +31,14 @@ declare const electronAPI: {
         outputPath?: string;
     }>;
     compareReports: (path1: string, path2: string) => Promise<string>;
+    fetchReportMeta: (dbPath: string) => Promise<Record<string, string> | null>;
+    fetchReportResults: (dbPath: string) => Promise<unknown[]>;
+    renderReportHtml: (dbPath: string) => Promise<string>;
+    exportReportHtml: (dbPath: string) => Promise<{
+        success: boolean;
+        outputPath?: string;
+        error?: string;
+    }>;
     loadConfig: () => Promise<AppConfig>;
     saveConfig: (config: Partial<AppConfig>) => Promise<boolean>;
     analyzeWithAI: (reportPath: string, aiConfig: AIConfig) => Promise<AIAnalysisResult>;

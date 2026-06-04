@@ -8,7 +8,7 @@ export declare class FileManager {
     static ensureDir(dirPath: string): boolean;
     static loadPluginManifest(dbType: string): PluginManifest | null;
     static loadAllPluginManifests(): PluginManifest[];
-    static listReports(resultPath: string, filter?: ReportFilter): ReportMeta[];
+    static listReports(resultPath: string, filter?: ReportFilter): Promise<ReportMeta[]>;
     private static _scanReportsRecursive;
     static readFile(filePath: string): string | null;
     static deleteFile(filePath: string): boolean;
