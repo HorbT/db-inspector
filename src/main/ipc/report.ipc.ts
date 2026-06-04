@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { IPC_CHANNELS } from '@shared/types';
 import { SUPPORTED_DB_TYPES } from '@shared/constants';
 import type { ReportFilter } from '@shared/types';
@@ -109,7 +110,24 @@ export function registerReportHandlers(configStore: ConfigStore): void {
     }
   });
 
-  // Render .db report to HTML string (for in-app preview)
+  // Render .db report to a temp HTML file for in-app preview
+  ipcMain.handle('report:get-preview-url', async (_event, dbPath: string) => {
+    if (!fs.existsSync(dbPath)) {
+      throw new Error(`报告文件不存在: ${dbPath}`);
+    }
+    const db = new ReportDB(dbPath);
+    try {
+      const html = await renderDbToHtml(db, dbPath);
+      // Write to temp file
+      const tmpDir = os.tmpdir();
+      const dbId = path.basename(dbPath, '.db');
+      const tmpPath = path.join(tmpDir, `db-inspector-preview-${dbId}.html`);
+      fs.writeFileSync(tmpPath, html, 'utf-8');
+      return `file:///${tmpPath.replace(/\\/g, '/')}`;
+    } finally {
+      await db.close();
+    }
+  });
   ipcMain.handle('report:render-db-to-html', async (_event, dbPath: string) => {
     if (!fs.existsSync(dbPath)) {
       throw new Error(`报告文件不存在: ${dbPath}`);

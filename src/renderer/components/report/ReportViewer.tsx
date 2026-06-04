@@ -1,24 +1,25 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface ReportViewerProps {
   dbPath: string;
 }
 
 export function ReportViewer({ dbPath }: ReportViewerProps): React.ReactElement {
-  const [htmlContent, setHtmlContent] = useState<string | null>(null);
+  const [htmlPath, setHtmlPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setHtmlPath(null);
+    setLoading(true);
+    setError(null);
+
     (async () => {
-      setLoading(true);
-      setError(null);
       try {
-        const html = await window.electronAPI.renderReportHtml(dbPath);
+        const previewUrl = await window.electronAPI.getPreviewUrl(dbPath);
         if (!cancelled) {
-          setHtmlContent(html);
+          setHtmlPath(previewUrl);
         }
       } catch (err) {
         if (!cancelled) {
@@ -35,7 +36,7 @@ export function ReportViewer({ dbPath }: ReportViewerProps): React.ReactElement 
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <svg className="animate-spin h-8 w-8 mx-auto mb-3 text-primary" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
@@ -49,28 +50,29 @@ export function ReportViewer({ dbPath }: ReportViewerProps): React.ReactElement 
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-full">
         <div className="text-center text-danger">
-          <p className="text-sm">加载报告失败: {error}</p>
+          <p className="text-sm">加载报告失败</p>
+          <p className="text-xs mt-1 text-muted-foreground">{error}</p>
         </div>
       </div>
     );
   }
 
-  if (!htmlContent) {
+  if (!htmlPath) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground text-sm">无报告数据</p>
       </div>
     );
   }
 
+  // Use key to force iframe recreate on path change, src loads via file:///
   return (
     <iframe
-      ref={iframeRef}
-      srcDoc={htmlContent}
-      className="w-full h-full border-0 rounded-lg bg-white"
-      style={{ minHeight: '400px' }}
+      key={htmlPath}
+      src={htmlPath}
+      className="w-full h-full border-0 bg-white"
       title="巡检报告"
     />
   );

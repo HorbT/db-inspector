@@ -33,14 +33,6 @@ export function InspectionPage(): React.ReactElement {
       }
     });
 
-    const unsubResultItem = window.electronAPI.onInspectionResultItem((item: InspectionResultItem) => {
-      if (item.error) {
-        addLog(`[${item.fileName}] 失败: ${item.error}`, 'error');
-      } else {
-        addLog(`[${item.fileName}] 完成 (${item.columns?.length || 0}列, ${item.rowCount ?? 0}行)`, 'success');
-      }
-    });
-
     const unsubResult = window.electronAPI.onInspectionResult((result: InspectionResult) => {
       addResult(result);
       hasResults.current = true;
@@ -54,7 +46,6 @@ export function InspectionPage(): React.ReactElement {
 
     return () => {
       unsubProgress();
-      unsubResultItem();
       unsubResult();
     };
   }, []);

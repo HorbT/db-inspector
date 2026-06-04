@@ -108,7 +108,7 @@ function resultToHtml(
               if (cell === null) {
                 parts.push('<td></td>');
               } else {
-                parts.push(`<td>${escapeHtml(String(cell))}</td>`);
+                parts.push(`<td>${String(cell)}</td>`);
               }
             }
           }

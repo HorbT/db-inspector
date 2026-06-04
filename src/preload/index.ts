@@ -58,6 +58,8 @@ const electronAPI = {
     ipcRenderer.invoke('report:read-db-results', dbPath),
   renderReportHtml: (dbPath: string): Promise<string> =>
     ipcRenderer.invoke('report:render-db-to-html', dbPath),
+  getPreviewUrl: (dbPath: string): Promise<string> =>
+    ipcRenderer.invoke('report:get-preview-url', dbPath),
   exportReportHtml: (dbPath: string): Promise<{ success: boolean; outputPath?: string; error?: string }> =>
     ipcRenderer.invoke('report:export-db-to-html', dbPath),
 

@@ -177,7 +177,7 @@ export class FileManager {
 
           reports.push({
             id: Buffer.from(fullPath).toString('base64'),
-            fileName: `${description}_${dbId}.db`,
+            fileName: entry.name,
             filePath: fullPath,
             dbType,
             description,

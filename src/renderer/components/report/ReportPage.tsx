@@ -173,7 +173,7 @@ export function ReportPage(): React.ReactElement {
         </div>
 
         {/* Report Preview */}
-        <div className="card p-4 overflow-auto lg:col-span-2">
+        <div className="card p-4 overflow-hidden lg:col-span-2 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-sm">报告预览</h2>
             {selectedReport && (
@@ -202,11 +202,11 @@ export function ReportPage(): React.ReactElement {
           </div>
           {selectedReport ? (
             selectedReport.filePath.endsWith('.db') ? (
-              <div className="w-full h-[calc(100%-2rem)] overflow-auto">
+              <div className="flex flex-col flex-1 min-h-0">
                 <ReportViewer dbPath={selectedReport.filePath} />
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center p-8">
+              <div className="flex flex-col items-center justify-center flex-1 text-center p-8">
                 <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
@@ -225,7 +225,7 @@ export function ReportPage(): React.ReactElement {
               </div>
             )
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="flex-1 flex items-center justify-center text-muted-foreground">
               <p className="text-sm">请选择一个报告查看</p>
             </div>
           )}
