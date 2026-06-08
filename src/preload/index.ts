@@ -62,6 +62,8 @@ const electronAPI = {
     ipcRenderer.invoke('report:get-preview-url', dbPath),
   exportReportHtml: (dbPath: string): Promise<{ success: boolean; outputPath?: string; error?: string }> =>
     ipcRenderer.invoke('report:export-db-to-html', dbPath),
+  getResultsByIndices: (dbPath: string, indices: number[]): Promise<unknown[]> =>
+    ipcRenderer.invoke('report:get-results-by-indices', dbPath, indices),
 
   // Config operations
   loadConfig: (): Promise<AppConfig> =>
@@ -72,12 +74,18 @@ const electronAPI = {
   // AI operations
   analyzeWithAI: (reportPath: string, aiConfig: AIConfig): Promise<AIAnalysisResult> =>
     ipcRenderer.invoke('ai:analyze', reportPath, aiConfig),
+  analyzeText: (text: string, aiConfig: AIConfig): Promise<AIAnalysisResult> =>
+    ipcRenderer.invoke('ai:analyze-text', text, aiConfig),
   loadAIConfig: (): Promise<AIConfig> =>
     ipcRenderer.invoke('ai:config-load'),
   saveAIConfig: (config: AIConfig): Promise<boolean> =>
     ipcRenderer.invoke('ai:config-save', config),
   fetchAIModels: (config: AIConfig): Promise<string[]> =>
     ipcRenderer.invoke('ai:fetch-models', config),
+  aiCacheGet: (key: string): Promise<string | null> =>
+    ipcRenderer.invoke('ai:cache-get', key),
+  aiCacheSet: (key: string, value: string): Promise<void> =>
+    ipcRenderer.invoke('ai:cache-set', key, value),
 
   // Plugin operations
   listPlugins: (): Promise<PluginManifest[]> =>

@@ -155,4 +155,33 @@ export function registerReportHandlers(configStore: ConfigStore): void {
       await db.close();
     }
   });
+
+  // Get specific results by file_num indices from .db
+  ipcMain.handle('report:get-results-by-indices', async (_event, dbPath: string, indices: number[]) => {
+    if (!fs.existsSync(dbPath)) {
+      throw new Error(`报告文件不存在: ${dbPath}`);
+    }
+    const db = new ReportDB(dbPath);
+    try {
+      const allResults = await db.getAllResults();
+      return allResults.filter((r: { file_name: string }) => {
+        const match = r.file_name.match(/\d+/);
+        const num = match ? parseInt(match[0], 10) : -1;
+        return indices.includes(num);
+      });
+    } finally {
+      await db.close();
+    }
+  });
+
+  // Temp storage for AI section analysis results (cleared on app quit)
+  const aiResultsCache = new Map<string, string>();
+
+  ipcMain.handle('ai:cache-get', async (_event, key: string) => {
+    return aiResultsCache.get(key) || null;
+  });
+
+  ipcMain.handle('ai:cache-set', async (_event, key: string, value: string) => {
+    aiResultsCache.set(key, value);
+  });
 }

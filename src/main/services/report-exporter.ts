@@ -60,6 +60,11 @@ export async function renderDbToHtml(db: ReportDB, dbPath: string): Promise<stri
     html = html.replace('{{results}}', allHtml);
   }
 
+  // Inject AI analysis script (before </body>)
+  const injectScriptPath = path.join(FileManager.getResourcesPath(), 'dbinspection', 'ai-analysis-inject.js');
+  const injectScriptUrl = `file:///${injectScriptPath.replace(/\\/g, '/')}`;
+  html = html.replace('</body>', `<script src="${injectScriptUrl}"></script></body>`);
+
   return html;
 }
 
@@ -85,7 +90,8 @@ function resultToHtml(
   rows: unknown[],
   error: string | null,
 ): string {
-  const parts = ['<div class="result-section">'];
+  const fileNum = extractFileNumber(fileName);
+  const parts = [`<div class="result-section" data-result-index="${fileNum}">`];
 
   if (error) {
     parts.push(`<p class="error">错误: ${escapeHtml(error)} (来源: ${escapeHtml(fileName)})</p>`);

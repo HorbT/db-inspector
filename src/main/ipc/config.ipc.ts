@@ -45,6 +45,16 @@ export function registerConfigHandlers(configStore: ConfigStore): void {
     }
   });
 
+  // AI analyze text (for section-level analysis)
+  ipcMain.handle('ai:analyze-text', async (_event, text: string, aiConfig: AIConfig) => {
+    try {
+      const result = await callAIAPI(text, aiConfig);
+      return result;
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
   // Fetch models
   ipcMain.handle(IPC_CHANNELS.AI_FETCH_MODELS, async (_event, config: AIConfig) => {
     try {
