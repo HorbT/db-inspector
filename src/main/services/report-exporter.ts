@@ -39,7 +39,8 @@ export async function renderDbToHtml(db: ReportDB, dbPath: string): Promise<stri
   const results = await db.getAllResults();
 
   for (const r of results) {
-    const resultHtml = resultToHtml(r.file_name, r.columns, r.rows, r.error);
+    const rows = await db.loadResultRows(r.file_num);
+    const resultHtml = resultToHtml(r.file_name, r.columns, rows, r.error);
     const fileNum = extractFileNumber(r.file_name);
 
     if (fileNum >= 0) {
@@ -56,8 +57,12 @@ export async function renderDbToHtml(db: ReportDB, dbPath: string): Promise<stri
 
   // If {{results}} exists, insert all results there
   if (html.includes('{{results}}')) {
-    const allHtml = results.map(r => resultToHtml(r.file_name, r.columns, r.rows, r.error)).join('\n');
-    html = html.replace('{{results}}', allHtml);
+    const parts: string[] = [];
+    for (const r of results) {
+      const rows = await db.loadResultRows(r.file_num);
+      parts.push(resultToHtml(r.file_name, r.columns, rows, r.error));
+    }
+    html = html.replace('{{results}}', parts.join('\n'));
   }
 
   // Inject AI analysis script (before </body>)

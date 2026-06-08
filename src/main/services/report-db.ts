@@ -217,33 +217,40 @@ export class ReportDB {
 
   async getAllResults(): Promise<(ResultRow & { rows: unknown[] })[]> {
     await this._ensureReady();
-    const result = this.db!.exec('SELECT * FROM results ORDER BY file_num');
+    const result = this.db!.exec(
+      'SELECT file_num, file_name, section, columns, row_count, row_pages, error FROM results ORDER BY file_num',
+    );
     if (result.length === 0) return [];
 
-    const out: (ResultRow & { rows: unknown[] })[] = [];
-    for (const row of result[0].values) {
-      const r: ResultRow = {
-        file_name: row[1] as string,
-        file_num: row[0] as number,
-        section: row[2] as string,
-        columns: row[3] as string | null,
-        row_count: row[4] as number,
-        row_pages: row[5] as number,
-        error: row[6] as string | null,
-      };
-      const pagesResult = this.db!.exec(
-        'SELECT page_data FROM pages WHERE file_num = ? ORDER BY page_idx',
-        [r.file_num],
-      );
-      const rows: unknown[] = [];
-      if (pagesResult.length > 0) {
-        for (const pRow of pagesResult[0].values) {
-          rows.push(...(JSON.parse(pRow[0] as string) as unknown[]));
-        }
+    return result[0].values.map(row => ({
+      file_name: row[1] as string,
+      file_num: row[0] as number,
+      section: row[2] as string,
+      columns: row[3] as string | null,
+      row_count: row[4] as number,
+      row_pages: row[5] as number,
+      error: row[6] as string | null,
+      rows: [] as unknown[],
+    }));
+  }
+
+  /**
+   * Lazily load data rows for a single result by file_num.
+   * Use this instead of getAllResults().rows to avoid loading all data into memory at once.
+   */
+  async loadResultRows(fileNum: number): Promise<unknown[]> {
+    await this._ensureReady();
+    const pagesResult = this.db!.exec(
+      'SELECT page_data FROM pages WHERE file_num = ? ORDER BY page_idx',
+      [fileNum],
+    );
+    const rows: unknown[] = [];
+    if (pagesResult.length > 0) {
+      for (const pRow of pagesResult[0].values) {
+        rows.push(...(JSON.parse(pRow[0] as string) as unknown[]));
       }
-      out.push({ ...r, rows });
     }
-    return out;
+    return rows;
   }
 
   async resultCount(): Promise<number> {

@@ -3,7 +3,6 @@ import path from 'path';
 import { app } from 'electron';
 import type { ReportMeta, ReportFilter, PluginManifest } from '@shared/types';
 import { SUPPORTED_DB_TYPES, RESOURCES_BASE_PATH } from '@shared/constants';
-import { ReportDB } from './report-db';
 
 export class FileManager {
   static getResourcesPath(): string {
@@ -163,32 +162,37 @@ export class FileManager {
           fileSize: stat.size,
         });
       } else if (entry.isFile() && entry.name.endsWith('.db')) {
-        // SQLite-based inspection report
+        // SQLite-based inspection report — parse metadata from filename to avoid
+        // loading the entire SQLite database into WASM memory during scanning.
         const stat = fs.statSync(fullPath);
-        try {
-          const db = new ReportDB(fullPath);
-          const meta = await db.getMeta();
-          await db.close();
+        const dbId = path.basename(fullPath, '.db');
 
-          const dbType = meta.get('db_type') || 'unknown';
-          const description = meta.get('description') || entry.name.replace('.db', '');
-          const generatedTime = meta.get('generated_time') || '';
-          const dbId = path.basename(fullPath, '.db');
+        // Filename format: {description}_{YYYY-MM-DD}T{HH-MM-SS}.db
+        const tsMatch = dbId.match(/^(.+?)_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})$/);
+        let description: string;
+        let createdAt: string;
 
-          reports.push({
-            id: Buffer.from(fullPath).toString('base64'),
-            fileName: entry.name,
-            filePath: fullPath,
-            dbType,
-            description,
-            createdAt: generatedTime ? new Date(generatedTime).toISOString() : stat.mtime.toISOString(),
-            fileSize: stat.size,
-            dbId,
-          });
-        } catch {
-          // Corrupted or inaccessible db, skip
-          console.error('[FileManager] Failed to read inspection db:', fullPath);
+        if (tsMatch) {
+          description = tsMatch[1];
+          // Convert filename timestamp to ISO: 2026-06-04T03-56-42 -> 2026-06-04T03:56:42
+          const parts = tsMatch[2].split('T');
+          const isoTime = parts[1].replace(/-/g, ':');
+          createdAt = new Date(`${parts[0]}T${isoTime}`).toISOString();
+        } else {
+          description = dbId;
+          createdAt = stat.mtime.toISOString();
         }
+
+        reports.push({
+          id: Buffer.from(fullPath).toString('base64'),
+          fileName: entry.name,
+          filePath: fullPath,
+          dbType: 'unknown',
+          description,
+          createdAt,
+          fileSize: stat.size,
+          dbId,
+        });
       }
     }
   }

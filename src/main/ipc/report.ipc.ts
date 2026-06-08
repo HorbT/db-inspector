@@ -10,6 +10,38 @@ import { FileManager } from '../services/file-manager';
 import { ReportDB } from '../services/report-db';
 import { exportDbToHtml, renderDbToHtml } from '../services/report-exporter';
 
+// ReportDB LRU cache: reuse sql.js WASM instances instead of reloading from disk
+const MAX_CACHED_DBS = 3;
+const dbCache = new Map<string, { db: ReportDB; lastUsed: number }>();
+
+async function getReportDB(dbPath: string): Promise<ReportDB> {
+  const cached = dbCache.get(dbPath);
+  if (cached) {
+    cached.lastUsed = Date.now();
+    return cached.db;
+  }
+
+  // Evict LRU if cache is full
+  if (dbCache.size >= MAX_CACHED_DBS) {
+    let oldestKey = '';
+    let oldestTime = Infinity;
+    for (const [key, entry] of dbCache) {
+      if (entry.lastUsed < oldestTime) {
+        oldestTime = entry.lastUsed;
+        oldestKey = key;
+      }
+    }
+    if (oldestKey) {
+      await dbCache.get(oldestKey)!.db.close();
+      dbCache.delete(oldestKey);
+    }
+  }
+
+  const db = new ReportDB(dbPath);
+  dbCache.set(dbPath, { db, lastUsed: Date.now() });
+  return db;
+}
+
 export function registerReportHandlers(configStore: ConfigStore): void {
   ipcMain.handle(IPC_CHANNELS.REPORT_LIST, (_event, filter?: ReportFilter) => {
     const resultPath = configStore.getResultPath();
@@ -88,26 +120,17 @@ export function registerReportHandlers(configStore: ConfigStore): void {
     return JSON.stringify({ report1: content1, report2: content2 });
   });
 
-  // SQLite-based report reading
   ipcMain.handle('report:read-db-meta', async (_event, dbPath: string) => {
     if (!fs.existsSync(dbPath)) return null;
-    const db = new ReportDB(dbPath);
-    try {
-      const meta = await db.getMeta();
-      return Object.fromEntries(meta);
-    } finally {
-      await db.close();
-    }
+    const db = await getReportDB(dbPath);
+    const meta = await db.getMeta();
+    return Object.fromEntries(meta);
   });
 
   ipcMain.handle('report:read-db-results', async (_event, dbPath: string) => {
     if (!fs.existsSync(dbPath)) return [];
-    const db = new ReportDB(dbPath);
-    try {
-      return await db.getAllResults();
-    } finally {
-      await db.close();
-    }
+    const db = await getReportDB(dbPath);
+    return await db.getAllResults();
   });
 
   // Render .db report to a temp HTML file for in-app preview
@@ -115,29 +138,21 @@ export function registerReportHandlers(configStore: ConfigStore): void {
     if (!fs.existsSync(dbPath)) {
       throw new Error(`报告文件不存在: ${dbPath}`);
     }
-    const db = new ReportDB(dbPath);
-    try {
-      const html = await renderDbToHtml(db, dbPath);
-      // Write to temp file
-      const tmpDir = os.tmpdir();
-      const dbId = path.basename(dbPath, '.db');
-      const tmpPath = path.join(tmpDir, `db-inspector-preview-${dbId}.html`);
-      fs.writeFileSync(tmpPath, html, 'utf-8');
-      return `file:///${tmpPath.replace(/\\/g, '/')}`;
-    } finally {
-      await db.close();
-    }
+    const db = await getReportDB(dbPath);
+    const html = await renderDbToHtml(db, dbPath);
+    // Write to temp file
+    const tmpDir = os.tmpdir();
+    const dbId = path.basename(dbPath, '.db');
+    const tmpPath = path.join(tmpDir, `db-inspector-preview-${dbId}.html`);
+    fs.writeFileSync(tmpPath, html, 'utf-8');
+    return `file:///${tmpPath.replace(/\\/g, '/')}`;
   });
   ipcMain.handle('report:render-db-to-html', async (_event, dbPath: string) => {
     if (!fs.existsSync(dbPath)) {
       throw new Error(`报告文件不存在: ${dbPath}`);
     }
-    const db = new ReportDB(dbPath);
-    try {
-      return await renderDbToHtml(db, dbPath);
-    } finally {
-      await db.close();
-    }
+    const db = await getReportDB(dbPath);
+    return await renderDbToHtml(db, dbPath);
   });
 
   // Export .db report to HTML
@@ -145,33 +160,34 @@ export function registerReportHandlers(configStore: ConfigStore): void {
     if (!fs.existsSync(dbPath)) {
       throw new Error(`报告文件不存在: ${dbPath}`);
     }
-    const db = new ReportDB(dbPath);
+    const db = await getReportDB(dbPath);
     try {
       const htmlPath = await exportDbToHtml(db, dbPath);
       return { success: true, outputPath: htmlPath };
     } catch (err) {
       return { success: false, error: (err as Error).message };
-    } finally {
-      await db.close();
     }
   });
 
-  // Get specific results by file_num indices from .db
+  // Get specific results by file_num indices from .db (rows loaded lazily)
   ipcMain.handle('report:get-results-by-indices', async (_event, dbPath: string, indices: number[]) => {
     if (!fs.existsSync(dbPath)) {
       throw new Error(`报告文件不存在: ${dbPath}`);
     }
-    const db = new ReportDB(dbPath);
-    try {
-      const allResults = await db.getAllResults();
-      return allResults.filter((r: { file_name: string }) => {
-        const match = r.file_name.match(/\d+/);
-        const num = match ? parseInt(match[0], 10) : -1;
-        return indices.includes(num);
-      });
-    } finally {
-      await db.close();
+    const db = await getReportDB(dbPath);
+    const allResults = await db.getAllResults();
+    const matched = allResults.filter((r: { file_name: string }) => {
+      const match = r.file_name.match(/\d+/);
+      const num = match ? parseInt(match[0], 10) : -1;
+      return indices.includes(num);
+    });
+    // Load rows only for matched results
+    const out = [];
+    for (const r of matched) {
+      const rows = await db.loadResultRows(r.file_num);
+      out.push({ ...r, rows });
     }
+    return out;
   });
 
   // Temp storage for AI section analysis results (cleared on app quit)
