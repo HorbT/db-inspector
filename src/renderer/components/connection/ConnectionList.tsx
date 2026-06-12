@@ -1,13 +1,28 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useConnectionStore } from '../../store/connectionStore';
-import { DB_TYPE_LABELS } from '@shared/constants';
+import { DB_TYPE_LABELS, SUPPORTED_DB_TYPES } from '@shared/constants';
 import type { DBType } from '@shared/constants';
 
 export function ConnectionList(): React.ReactElement {
   const {
     connections, plugins, selectedConnectionIds,
     toggleConnectionSelection, deleteConnections, loadConnections,
+    setSelectedConnectionIds,
   } = useConnectionStore();
+
+  const [filterDbType, setFilterDbType] = useState<string>('all');
+
+  // Get unique db types from existing connections for tabs
+  const existingTypes = useMemo(() => {
+    const types = new Set(connections.map(c => c.dbType));
+    return SUPPORTED_DB_TYPES.filter(t => types.has(t));
+  }, [connections]);
+
+  // Filtered connections
+  const filteredConnections = useMemo(() => {
+    if (filterDbType === 'all') return connections;
+    return connections.filter(c => c.dbType === filterDbType);
+  }, [connections, filterDbType]);
 
   const getPluginInfo = (dbType: string) => {
     return plugins.find(p => p.id === dbType);
@@ -21,6 +36,26 @@ export function ConnectionList(): React.ReactElement {
   const handleRefresh = () => {
     loadConnections();
   };
+
+  const handleSelectAll = () => {
+    const allIds = filteredConnections.map(c => c.id);
+    if (allIds.length === 0) return;
+    // If all filtered are already selected, deselect all; otherwise select all
+    const allSelected = allIds.every(id => selectedConnectionIds.includes(id));
+    if (allSelected) {
+      setSelectedConnectionIds(
+        selectedConnectionIds.filter(id => !allIds.includes(id))
+      );
+    } else {
+      // Select all filtered + keep any selections from other filters
+      const newIds = new Set([...selectedConnectionIds, ...allIds]);
+      setSelectedConnectionIds([...newIds]);
+    }
+  };
+
+  // Check if all filtered connections are selected
+  const allFilteredSelected = filteredConnections.length > 0
+    && filteredConnections.every(c => selectedConnectionIds.includes(c.id));
 
   if (connections.length === 0) {
     return (
@@ -38,9 +73,47 @@ export function ConnectionList(): React.ReactElement {
 
   return (
     <div className="flex flex-col h-full">
+      {/* DB Type filter tabs */}
+      <div className="flex gap-1 mb-2 flex-wrap">
+        <button
+          onClick={() => setFilterDbType('all')}
+          className={`px-2 py-0.5 rounded text-xs transition-colors ${
+            filterDbType === 'all'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+          }`}
+        >
+          全部 ({connections.length})
+        </button>
+        {existingTypes.map(type => (
+          <button
+            key={type}
+            onClick={() => setFilterDbType(type)}
+            className={`px-2 py-0.5 rounded text-xs transition-colors ${
+              filterDbType === type
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            {DB_TYPE_LABELS[type as DBType] || type} ({connections.filter(c => c.dbType === type).length})
+          </button>
+        ))}
+      </div>
+
+      {/* Action buttons */}
       <div className="flex gap-1 mb-2">
         <button onClick={handleRefresh} className="text-xs btn-secondary py-1 px-2" title="刷新列表">
           刷新
+        </button>
+        <button
+          onClick={handleSelectAll}
+          className={`text-xs py-1 px-2 rounded transition-colors ${
+            allFilteredSelected
+              ? 'bg-muted text-muted-foreground'
+              : 'btn-secondary'
+          }`}
+        >
+          {allFilteredSelected ? '取消全选' : '全选'}
         </button>
         {selectedConnectionIds.length > 0 && (
           <button onClick={handleDelete} className="text-xs btn-danger py-1 px-2">
@@ -48,8 +121,10 @@ export function ConnectionList(): React.ReactElement {
           </button>
         )}
       </div>
+
+      {/* Connection list */}
       <div className="space-y-1.5 overflow-auto flex-1">
-        {connections.map((conn) => {
+        {filteredConnections.map((conn) => {
           const plugin = getPluginInfo(conn.dbType);
           const isSelected = selectedConnectionIds.includes(conn.id);
 
@@ -75,6 +150,11 @@ export function ConnectionList(): React.ReactElement {
             </div>
           );
         })}
+        {filteredConnections.length === 0 && (
+          <div className="text-center py-4 text-muted-foreground text-xs">
+            {filterDbType === 'all' ? '暂无连接' : `暂无 ${DB_TYPE_LABELS[filterDbType as DBType] || filterDbType} 连接`}
+          </div>
+        )}
       </div>
     </div>
   );
