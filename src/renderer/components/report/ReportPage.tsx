@@ -157,12 +157,7 @@ export function ReportPage(): React.ReactElement {
                     </div>
                   </div>
                   <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground">
-                    {report.dbType !== 'unknown' && (
-                      <span className="px-1 py-0.5 rounded bg-muted">
-                        {DB_TYPE_LABELS[report.dbType as DBType] || report.dbType}
-                      </span>
-                    )}
-                    <span>{report.description}</span>
+                    <span>{DB_TYPE_LABELS[report.dbType as DBType] || report.dbType}</span>
                     <span>{new Date(report.createdAt).toLocaleDateString('zh-CN')}</span>
                     <span>{formatSize(report.fileSize)}</span>
                   </div>

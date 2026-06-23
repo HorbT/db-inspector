@@ -167,6 +167,16 @@ export class FileManager {
         const stat = fs.statSync(fullPath);
         const dbId = path.basename(fullPath, '.db');
 
+        // Detect dbType from parent directory name (e.g. resultPath/mysql/xxx.db)
+        let dbType = 'unknown';
+        const parentDir = path.basename(path.dirname(fullPath));
+        for (const type of SUPPORTED_DB_TYPES) {
+          if (parentDir.toLowerCase() === type.toLowerCase()) {
+            dbType = type;
+            break;
+          }
+        }
+
         // Filename format: {description}_{YYYY-MM-DD}T{HH-MM-SS}.db
         const tsMatch = dbId.match(/^(.+?)_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})$/);
         let description: string;
@@ -187,7 +197,7 @@ export class FileManager {
           id: Buffer.from(fullPath).toString('base64'),
           fileName: entry.name,
           filePath: fullPath,
-          dbType: 'unknown',
+          dbType,
           description,
           createdAt,
           fileSize: stat.size,
