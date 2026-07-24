@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { MotionConfig } from 'framer-motion';
 import { useUIStore } from './store/uiStore';
 import { useConnectionStore } from './store/connectionStore';
-import { AppShell } from './components/layout/AppShell';
+import { PreviewPage } from './components/ui/__preview__/PreviewPage';
 import { defaultTransition } from './lib/motion';
 
 export function App(): React.ReactElement {
@@ -27,7 +27,7 @@ export function App(): React.ReactElement {
 
   return (
     <MotionConfig transition={defaultTransition} reducedMotion="user">
-      <AppShell />
+      <PreviewPage />
     </MotionConfig>
   );
 }

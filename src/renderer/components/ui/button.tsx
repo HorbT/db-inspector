@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { motion } from 'framer-motion';
+import { motion, type HTMLMotionProps } from 'framer-motion';
 import { cn } from '@renderer/lib/utils';
 
 const buttonVariants = cva(
@@ -24,8 +24,22 @@ const buttonVariants = cva(
   }
 );
 
+// Omit keys whose types differ between React's ButtonHTMLAttributes and
+// framer-motion's HTMLMotionProps (e.g. onDrag, onAnimationStart) so the
+// intersection of the two is assignable to motion.button. We re-add the
+// plain DOM keys (children, className, style, etc.) that HTMLMotionProps
+// also exposes so consumers can pass them as plain React props.
+type ButtonBaseProps = Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  keyof HTMLMotionProps<'button'>
+> &
+  Pick<
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
+    'children' | 'className' | 'style'
+  >;
+
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+  extends ButtonBaseProps,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
 }
