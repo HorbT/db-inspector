@@ -8,7 +8,6 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const electron_1 = require("electron");
 const constants_1 = require("../../shared/constants");
-const report_db_1 = require("./report-db");
 class FileManager {
     static getResourcesPath() {
         if (electron_1.app.isPackaged) {
@@ -158,31 +157,44 @@ class FileManager {
                 });
             }
             else if (entry.isFile() && entry.name.endsWith('.db')) {
-                // SQLite-based inspection report
+                // SQLite-based inspection report — parse metadata from filename to avoid
+                // loading the entire SQLite database into WASM memory during scanning.
                 const stat = fs_1.default.statSync(fullPath);
-                try {
-                    const db = new report_db_1.ReportDB(fullPath);
-                    const meta = await db.getMeta();
-                    await db.close();
-                    const dbType = meta.get('db_type') || 'unknown';
-                    const description = meta.get('description') || entry.name.replace('.db', '');
-                    const generatedTime = meta.get('generated_time') || '';
-                    const dbId = path_1.default.basename(fullPath, '.db');
-                    reports.push({
-                        id: Buffer.from(fullPath).toString('base64'),
-                        fileName: `${description}_${dbId}.db`,
-                        filePath: fullPath,
-                        dbType,
-                        description,
-                        createdAt: generatedTime ? new Date(generatedTime).toISOString() : stat.mtime.toISOString(),
-                        fileSize: stat.size,
-                        dbId,
-                    });
+                const dbId = path_1.default.basename(fullPath, '.db');
+                // Detect dbType from parent directory name (e.g. resultPath/mysql/xxx.db)
+                let dbType = 'unknown';
+                const parentDir = path_1.default.basename(path_1.default.dirname(fullPath));
+                for (const type of constants_1.SUPPORTED_DB_TYPES) {
+                    if (parentDir.toLowerCase() === type.toLowerCase()) {
+                        dbType = type;
+                        break;
+                    }
                 }
-                catch {
-                    // Corrupted or inaccessible db, skip
-                    console.error('[FileManager] Failed to read inspection db:', fullPath);
+                // Filename format: {description}_{YYYY-MM-DD}T{HH-MM-SS}.db
+                const tsMatch = dbId.match(/^(.+?)_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})$/);
+                let description;
+                let createdAt;
+                if (tsMatch) {
+                    description = tsMatch[1];
+                    // Convert filename timestamp to ISO: 2026-06-04T03-56-42 -> 2026-06-04T03:56:42
+                    const parts = tsMatch[2].split('T');
+                    const isoTime = parts[1].replace(/-/g, ':');
+                    createdAt = new Date(`${parts[0]}T${isoTime}`).toISOString();
                 }
+                else {
+                    description = dbId;
+                    createdAt = stat.mtime.toISOString();
+                }
+                reports.push({
+                    id: Buffer.from(fullPath).toString('base64'),
+                    fileName: entry.name,
+                    filePath: fullPath,
+                    dbType,
+                    description,
+                    createdAt,
+                    fileSize: stat.size,
+                    dbId,
+                });
             }
         }
     }

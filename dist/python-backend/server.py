@@ -6,17 +6,22 @@ import sys
 import json
 import traceback
 import os
+import importlib
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from core.bridge import Bridge
 from core.inspector import InspectorEngine
-from plugins.mysql_plugin import MySQLPlugin
-from plugins.oracle_plugin import OraclePlugin
-from plugins.sqlserver_plugin import SQLServerPlugin
-from plugins.tidb_plugin import TiDBPlugin
-from plugins.starrocks_plugin import StarRocksPlugin
+
+# Map of available plugin types — lazy-loaded on first use
+_PLUGIN_TYPES = {
+    'mysql': 'plugins.mysql_plugin.MySQLPlugin',
+    'oracle': 'plugins.oracle_plugin.OraclePlugin',
+    'sqlserver': 'plugins.sqlserver_plugin.SQLServerPlugin',
+    'tidb': 'plugins.tidb_plugin.TiDBPlugin',
+    'starrocks': 'plugins.starrocks_plugin.StarRocksPlugin',
+}
 
 
 class Server:
@@ -24,26 +29,33 @@ class Server:
         self.bridge = Bridge()
         self.plugins = {}
         self.inspector = None
-        self._register_plugins()
         self._register_methods()
 
-    def _register_plugins(self):
-        """Register all database plugins."""
-        plugin_classes = {
-            'mysql': MySQLPlugin,
-            'oracle': OraclePlugin,
-            'sqlserver': SQLServerPlugin,
-            'tidb': TiDBPlugin,
-            'starrocks': StarRocksPlugin,
-        }
-        for db_type, plugin_cls in plugin_classes.items():
-            try:
-                self.plugins[db_type] = plugin_cls()
-                self.bridge.log(f"Plugin loaded: {db_type}")
-            except Exception as e:
-                self.bridge.log(f"Failed to load plugin {db_type}: {e}")
+    def _ensure_plugin(self, db_type: str):
+        """Lazy-load a plugin by db_type on first use."""
+        if db_type in self.plugins:
+            return self.plugins[db_type]
 
-        self.inspector = InspectorEngine(self.plugins)
+        module_path = _PLUGIN_TYPES.get(db_type)
+        if not module_path:
+            return None
+
+        try:
+            module_name, class_name = module_path.rsplit('.', 1)
+            module = importlib.import_module(module_name)
+            plugin_cls = getattr(module, class_name)
+            instance = plugin_cls()
+            self.plugins[db_type] = instance
+            self.bridge.log(f"Plugin loaded: {db_type}")
+
+            # Lazy-init inspector when first plugin is loaded
+            if self.inspector is None:
+                self.inspector = InspectorEngine(self.plugins)
+
+            return instance
+        except Exception as e:
+            self.bridge.log(f"Failed to load plugin {db_type}: {e}")
+            return None
 
     def _register_methods(self):
         """Register all JSON-RPC methods."""
@@ -52,12 +64,12 @@ class Server:
         self.bridge.register('inspection.execute', self._handle_inspection_execute)
 
     def _handle_ping(self, params):
-        return {'pong': True, 'plugins': list(self.plugins.keys())}
+        return {'pong': True, 'plugins': list(_PLUGIN_TYPES.keys())}
 
     def _handle_connection_test(self, params):
         """Test a database connection."""
         db_type = params.get('dbType', '')
-        plugin = self.plugins.get(db_type)
+        plugin = self._ensure_plugin(db_type)
         if not plugin:
             return {'success': False, 'message': f'不支持的数据库类型: {db_type}'}
 
@@ -86,7 +98,12 @@ class Server:
     def _handle_inspection_execute(self, params):
         """Execute a full inspection on a database connection."""
         db_type = params.get('dbType', '')
-        plugin = self.plugins.get(db_type)
+
+        # Ensure inspector is initialized (lazy, first inspection creates it)
+        if self.inspector is None:
+            self.inspector = InspectorEngine(self.plugins)
+
+        plugin = self._ensure_plugin(db_type)
         if not plugin:
             return {
                 'success': False,

@@ -34,17 +34,22 @@ declare const electronAPI: {
     fetchReportMeta: (dbPath: string) => Promise<Record<string, string> | null>;
     fetchReportResults: (dbPath: string) => Promise<unknown[]>;
     renderReportHtml: (dbPath: string) => Promise<string>;
+    getPreviewUrl: (dbPath: string) => Promise<string>;
     exportReportHtml: (dbPath: string) => Promise<{
         success: boolean;
         outputPath?: string;
         error?: string;
     }>;
+    getResultsByIndices: (dbPath: string, indices: number[]) => Promise<unknown[]>;
     loadConfig: () => Promise<AppConfig>;
     saveConfig: (config: Partial<AppConfig>) => Promise<boolean>;
     analyzeWithAI: (reportPath: string, aiConfig: AIConfig) => Promise<AIAnalysisResult>;
+    analyzeText: (text: string, aiConfig: AIConfig) => Promise<AIAnalysisResult>;
     loadAIConfig: () => Promise<AIConfig>;
     saveAIConfig: (config: AIConfig) => Promise<boolean>;
     fetchAIModels: (config: AIConfig) => Promise<string[]>;
+    aiCacheGet: (key: string) => Promise<string | null>;
+    aiCacheSet: (key: string, value: string) => Promise<void>;
     listPlugins: () => Promise<PluginManifest[]>;
     getPlugin: (id: string) => Promise<PluginManifest | null>;
     selectDirectory: () => Promise<string | null>;

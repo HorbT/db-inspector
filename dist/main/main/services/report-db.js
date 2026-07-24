@@ -156,30 +156,34 @@ class ReportDB {
     }
     async getAllResults() {
         await this._ensureReady();
-        const result = this.db.exec('SELECT * FROM results ORDER BY file_num');
+        const result = this.db.exec('SELECT file_num, file_name, section, columns, row_count, row_pages, error FROM results ORDER BY file_num');
         if (result.length === 0)
             return [];
-        const out = [];
-        for (const row of result[0].values) {
-            const r = {
-                file_name: row[1],
-                file_num: row[0],
-                section: row[2],
-                columns: row[3],
-                row_count: row[4],
-                row_pages: row[5],
-                error: row[6],
-            };
-            const pagesResult = this.db.exec('SELECT page_data FROM pages WHERE file_num = ? ORDER BY page_idx', [r.file_num]);
-            const rows = [];
-            if (pagesResult.length > 0) {
-                for (const pRow of pagesResult[0].values) {
-                    rows.push(...JSON.parse(pRow[0]));
-                }
+        return result[0].values.map(row => ({
+            file_name: row[1],
+            file_num: row[0],
+            section: row[2],
+            columns: row[3],
+            row_count: row[4],
+            row_pages: row[5],
+            error: row[6],
+            rows: [],
+        }));
+    }
+    /**
+     * Lazily load data rows for a single result by file_num.
+     * Use this instead of getAllResults().rows to avoid loading all data into memory at once.
+     */
+    async loadResultRows(fileNum) {
+        await this._ensureReady();
+        const pagesResult = this.db.exec('SELECT page_data FROM pages WHERE file_num = ? ORDER BY page_idx', [fileNum]);
+        const rows = [];
+        if (pagesResult.length > 0) {
+            for (const pRow of pagesResult[0].values) {
+                rows.push(...JSON.parse(pRow[0]));
             }
-            out.push({ ...r, rows });
         }
-        return out;
+        return rows;
     }
     async resultCount() {
         await this._ensureReady();

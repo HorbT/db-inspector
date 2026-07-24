@@ -36,6 +36,16 @@ function registerConfigHandlers(configStore) {
             return { success: false, error: err.message };
         }
     });
+    // AI analyze text (for section-level analysis)
+    electron_1.ipcMain.handle('ai:analyze-text', async (_event, text, aiConfig) => {
+        try {
+            const result = await callAIAPI(text, aiConfig);
+            return result;
+        }
+        catch (err) {
+            return { success: false, error: err.message };
+        }
+    });
     // Fetch models
     electron_1.ipcMain.handle(types_1.IPC_CHANNELS.AI_FETCH_MODELS, async (_event, config) => {
         try {

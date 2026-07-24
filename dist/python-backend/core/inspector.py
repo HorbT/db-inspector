@@ -88,10 +88,10 @@ class InspectorEngine:
         """
         Execute a full inspection for a single database connection.
         Results are streamed in real-time via stderr ([RSLT]/[DONE] events).
-        Returns metadata dict (no HTML generation — that's done on-demand from .db data).
+        Returns metadata dict only (no result data — all data goes through streaming).
         """
-        results = []
         error_count = 0
+        total_queries = 0
 
         # Validate SQL scripts directory
         if not os.path.exists(sql_scripts_dir):
@@ -158,12 +158,7 @@ class InspectorEngine:
 
                     # Convert rows to JSON-safe types
                     safe_rows = [_to_json_safe(row) for row in rows] if rows else []
-
-                    results.append({
-                        'fileName': file_name,
-                        'columns': columns,
-                        'rows': rows,
-                    })
+                    total_queries += 1
 
                     # Emit real-time result event (with JSON-safe data)
                     _emit_result({
@@ -180,10 +175,7 @@ class InspectorEngine:
 
                 except Exception as e:
                     error_count += 1
-                    results.append({
-                        'fileName': file_name,
-                        'error': str(e),
-                    })
+                    total_queries += 1
 
                     # Emit real-time error event
                     _emit_result({
@@ -210,14 +202,14 @@ class InspectorEngine:
             })
 
             if debug:
-                _emit_debug(f'巡检结束 | 共执行 {len(results)} 个查询 | 错误数: {error_count}')
+                _emit_debug(f'巡检结束 | 共执行 {total_queries} 个查询 | 错误数: {error_count}')
 
             return {
                 'connectionId': '',
                 'description': description,
                 'dbType': plugin.db_type,
                 'success': True,
-                'results': results,
+                'results': [],
                 'completedAt': get_timestamp(),
                 'serverInfo': server_info,
                 'total': total_scripts,
@@ -239,6 +231,6 @@ class InspectorEngine:
                 'success': False,
                 'error': str(e),
                 'traceback': traceback.format_exc(),
-                'results': results,
+                'results': [],
                 'completedAt': get_timestamp(),
             }

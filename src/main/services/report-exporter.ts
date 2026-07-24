@@ -35,40 +35,70 @@ export async function renderDbToHtml(db: ReportDB, dbPath: string): Promise<stri
     `$1="file:///${libsDir}/`
   );
 
-  // Get results and replace numbered placeholders
+  // Get results and embed as JSON for lazy rendering
   const results = await db.getAllResults();
+  const resultData: Array<{
+    fileNum: number;
+    fileName: string;
+    columns: string | null;
+    rows: unknown[];
+    error: string | null;
+  }> = [];
 
   for (const r of results) {
     const rows = await db.loadResultRows(r.file_num);
-    const resultHtml = resultToHtml(r.file_name, r.columns, rows, r.error);
     const fileNum = extractFileNumber(r.file_name);
-
-    if (fileNum >= 0) {
-      const dbPlaceholder = `{{ result_${fileNum} }}`;
-      html = html.replace(new RegExp(escapeRegex(dbPlaceholder), 'g'), resultHtml);
-      const sbPlaceholder = `{ result_${fileNum} }`;
-      html = html.replace(new RegExp(escapeRegex(sbPlaceholder), 'g'), resultHtml);
-    }
+    resultData.push({
+      fileNum,
+      fileName: r.file_name,
+      columns: r.columns,
+      rows,
+      error: r.error,
+    });
   }
 
-  // Clear unmatched placeholders
-  html = html.replace(/\{\{\s*result_\d+\s*\}\}/g, '');
-  html = html.replace(/\{\s*result_\d+\s*\}/g, '');
+  // Replace all { result_N } and {{ result_N }} placeholders with empty divs
+  // that have data-result-num attributes for lazy rendering
+  html = html.replace(
+    /\{\{\s*result_(\d+)\s*\}\}/g,
+    '<div class="result-placeholder" data-result-num="$1"></div>'
+  );
+  html = html.replace(
+    /\{\s*result_(\d+)\s*\}/g,
+    '<div class="result-placeholder" data-result-num="$1"></div>'
+  );
 
-  // If {{results}} exists, insert all results there
+  // Handle {{results}} placeholder in default template
   if (html.includes('{{results}}')) {
     const parts: string[] = [];
-    for (const r of results) {
-      const rows = await db.loadResultRows(r.file_num);
-      parts.push(resultToHtml(r.file_name, r.columns, rows, r.error));
+    for (const item of resultData) {
+      parts.push(`<div class="result-placeholder" data-result-num="${item.fileNum}"></div>`);
     }
     html = html.replace('{{results}}', parts.join('\n'));
   }
 
-  // Inject AI analysis script (before </body>)
+  // Embed result data as Base64-encoded JSON to avoid any special character issues
+  const jsonData = Buffer.from(JSON.stringify(resultData)).toString('base64');
+  const dataScript = `<script id="report-data" type="application/base64">${jsonData}</script>`;
+
+  // Read lazy render script and embed it inline (avoids file:// loading issues in iframe)
+  const renderScriptPath = path.join(FileManager.getResourcesPath(), 'dbinspection', 'report-lazy-render.js');
+  let renderScript = '';
+  if (fs.existsSync(renderScriptPath)) {
+    renderScript = fs.readFileSync(renderScriptPath, 'utf-8');
+  }
+
+  // Read AI analysis inject script
   const injectScriptPath = path.join(FileManager.getResourcesPath(), 'dbinspection', 'ai-analysis-inject.js');
-  const injectScriptUrl = `file:///${injectScriptPath.replace(/\\/g, '/')}`;
-  html = html.replace('</body>', `<script src="${injectScriptUrl}"></script></body>`);
+  let injectScript = '';
+  if (fs.existsSync(injectScriptPath)) {
+    injectScript = fs.readFileSync(injectScriptPath, 'utf-8');
+  }
+
+  // Inject all scripts inline before </body>
+  html = html.replace('</body>',
+    `${dataScript}<script>${renderScript}</script><script>${injectScript}</script></body>`
+  );
 
   return html;
 }
@@ -89,66 +119,6 @@ function extractFileNumber(fileName: string): number {
   return match ? parseInt(match[1], 10) : -1;
 }
 
-function resultToHtml(
-  fileName: string,
-  columnsJson: string | null,
-  rows: unknown[],
-  error: string | null,
-): string {
-  const fileNum = extractFileNumber(fileName);
-  const parts = [`<div class="result-section" data-result-index="${fileNum}">`];
-
-  if (error) {
-    parts.push(`<p class="error">错误: ${escapeHtml(error)} (来源: ${escapeHtml(fileName)})</p>`);
-  } else if (columnsJson) {
-    const columns: string[] = JSON.parse(columnsJson);
-    if (!Array.isArray(columns) || columns.length === 0) {
-      parts.push(`<p>(${escapeHtml(fileName)}) 无表格数据</p>`);
-    } else {
-      parts.push('<table>');
-      parts.push('<tr>');
-      for (const col of columns) {
-        parts.push(`<th>${escapeHtml(String(col))}</th>`);
-      }
-      parts.push('</tr>');
-      if (rows.length > 0) {
-        for (const row of rows) {
-          parts.push('<tr>');
-          if (Array.isArray(row)) {
-            for (const cell of row) {
-              if (cell === null) {
-                parts.push('<td></td>');
-              } else {
-                parts.push(`<td>${String(cell)}</td>`);
-              }
-            }
-          }
-          parts.push('</tr>');
-        }
-      } else {
-        parts.push(`<tr><td colspan="${columns.length}" style="text-align:center">无数据</td></tr>`);
-      }
-      parts.push('</table>');
-    }
-  } else {
-    parts.push(`<p>(${escapeHtml(fileName)}) 无表格数据</p>`);
-  }
-
-  parts.push('</div>');
-  return parts.join('\n');
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 function getDefaultTemplate(): string {
   return `<!DOCTYPE html>

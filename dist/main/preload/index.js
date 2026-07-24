@@ -36,15 +36,20 @@ const electronAPI = {
     fetchReportMeta: (dbPath) => electron_1.ipcRenderer.invoke('report:read-db-meta', dbPath),
     fetchReportResults: (dbPath) => electron_1.ipcRenderer.invoke('report:read-db-results', dbPath),
     renderReportHtml: (dbPath) => electron_1.ipcRenderer.invoke('report:render-db-to-html', dbPath),
+    getPreviewUrl: (dbPath) => electron_1.ipcRenderer.invoke('report:get-preview-url', dbPath),
     exportReportHtml: (dbPath) => electron_1.ipcRenderer.invoke('report:export-db-to-html', dbPath),
+    getResultsByIndices: (dbPath, indices) => electron_1.ipcRenderer.invoke('report:get-results-by-indices', dbPath, indices),
     // Config operations
     loadConfig: () => electron_1.ipcRenderer.invoke('config:load'),
     saveConfig: (config) => electron_1.ipcRenderer.invoke('config:save', config),
     // AI operations
     analyzeWithAI: (reportPath, aiConfig) => electron_1.ipcRenderer.invoke('ai:analyze', reportPath, aiConfig),
+    analyzeText: (text, aiConfig) => electron_1.ipcRenderer.invoke('ai:analyze-text', text, aiConfig),
     loadAIConfig: () => electron_1.ipcRenderer.invoke('ai:config-load'),
     saveAIConfig: (config) => electron_1.ipcRenderer.invoke('ai:config-save', config),
     fetchAIModels: (config) => electron_1.ipcRenderer.invoke('ai:fetch-models', config),
+    aiCacheGet: (key) => electron_1.ipcRenderer.invoke('ai:cache-get', key),
+    aiCacheSet: (key, value) => electron_1.ipcRenderer.invoke('ai:cache-set', key, value),
     // Plugin operations
     listPlugins: () => electron_1.ipcRenderer.invoke('plugin:list'),
     getPlugin: (id) => electron_1.ipcRenderer.invoke('plugin:get', id),

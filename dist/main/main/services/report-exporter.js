@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.renderDbToHtml = renderDbToHtml;
 exports.exportDbToHtml = exportDbToHtml;
 const file_manager_1 = require("./file-manager");
+const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 /**
  * Render a .db inspection report to HTML string using the template for the db_type.
@@ -33,26 +34,49 @@ async function renderDbToHtml(db, dbPath) {
     // Fix relative resource paths for local file viewing (iframe/file protocol)
     const libsDir = file_manager_1.FileManager.getReportTemplateLibsDir(dbType).replace(/\\/g, '/');
     html = html.replace(/(src|href)="\.\.\/report_template\/libs\//g, `$1="file:///${libsDir}/`);
-    // Get results and replace numbered placeholders
+    // Get results and embed as JSON for lazy rendering
     const results = await db.getAllResults();
+    const resultData = [];
     for (const r of results) {
-        const resultHtml = resultToHtml(r.file_name, r.columns, r.rows, r.error);
+        const rows = await db.loadResultRows(r.file_num);
         const fileNum = extractFileNumber(r.file_name);
-        if (fileNum >= 0) {
-            const dbPlaceholder = `{{ result_${fileNum} }}`;
-            html = html.replace(new RegExp(escapeRegex(dbPlaceholder), 'g'), resultHtml);
-            const sbPlaceholder = `{ result_${fileNum} }`;
-            html = html.replace(new RegExp(escapeRegex(sbPlaceholder), 'g'), resultHtml);
-        }
+        resultData.push({
+            fileNum,
+            fileName: r.file_name,
+            columns: r.columns,
+            rows,
+            error: r.error,
+        });
     }
-    // Clear unmatched placeholders
-    html = html.replace(/\{\{\s*result_\d+\s*\}\}/g, '');
-    html = html.replace(/\{\s*result_\d+\s*\}/g, '');
-    // If {{results}} exists, insert all results there
+    // Replace all { result_N } and {{ result_N }} placeholders with empty divs
+    // that have data-result-num attributes for lazy rendering
+    html = html.replace(/\{\{\s*result_(\d+)\s*\}\}/g, '<div class="result-placeholder" data-result-num="$1"></div>');
+    html = html.replace(/\{\s*result_(\d+)\s*\}/g, '<div class="result-placeholder" data-result-num="$1"></div>');
+    // Handle {{results}} placeholder in default template
     if (html.includes('{{results}}')) {
-        const allHtml = results.map(r => resultToHtml(r.file_name, r.columns, r.rows, r.error)).join('\n');
-        html = html.replace('{{results}}', allHtml);
+        const parts = [];
+        for (const item of resultData) {
+            parts.push(`<div class="result-placeholder" data-result-num="${item.fileNum}"></div>`);
+        }
+        html = html.replace('{{results}}', parts.join('\n'));
     }
+    // Embed result data as Base64-encoded JSON to avoid any special character issues
+    const jsonData = Buffer.from(JSON.stringify(resultData)).toString('base64');
+    const dataScript = `<script id="report-data" type="application/base64">${jsonData}</script>`;
+    // Read lazy render script and embed it inline (avoids file:// loading issues in iframe)
+    const renderScriptPath = path_1.default.join(file_manager_1.FileManager.getResourcesPath(), 'dbinspection', 'report-lazy-render.js');
+    let renderScript = '';
+    if (fs_1.default.existsSync(renderScriptPath)) {
+        renderScript = fs_1.default.readFileSync(renderScriptPath, 'utf-8');
+    }
+    // Read AI analysis inject script
+    const injectScriptPath = path_1.default.join(file_manager_1.FileManager.getResourcesPath(), 'dbinspection', 'ai-analysis-inject.js');
+    let injectScript = '';
+    if (fs_1.default.existsSync(injectScriptPath)) {
+        injectScript = fs_1.default.readFileSync(injectScriptPath, 'utf-8');
+    }
+    // Inject all scripts inline before </body>
+    html = html.replace('</body>', `${dataScript}<script>${renderScript}</script><script>${injectScript}</script></body>`);
     return html;
 }
 /**
@@ -68,61 +92,6 @@ async function exportDbToHtml(db, dbPath) {
 function extractFileNumber(fileName) {
     const match = fileName.match(/(\d+)/);
     return match ? parseInt(match[1], 10) : -1;
-}
-function resultToHtml(fileName, columnsJson, rows, error) {
-    const parts = ['<div class="result-section">'];
-    if (error) {
-        parts.push(`<p class="error">错误: ${escapeHtml(error)} (来源: ${escapeHtml(fileName)})</p>`);
-    }
-    else if (columnsJson) {
-        const columns = JSON.parse(columnsJson);
-        if (!Array.isArray(columns) || columns.length === 0) {
-            parts.push(`<p>(${escapeHtml(fileName)}) 无表格数据</p>`);
-        }
-        else {
-            parts.push('<table>');
-            parts.push('<tr>');
-            for (const col of columns) {
-                parts.push(`<th>${escapeHtml(String(col))}</th>`);
-            }
-            parts.push('</tr>');
-            if (rows.length > 0) {
-                for (const row of rows) {
-                    parts.push('<tr>');
-                    if (Array.isArray(row)) {
-                        for (const cell of row) {
-                            if (cell === null) {
-                                parts.push('<td></td>');
-                            }
-                            else {
-                                parts.push(`<td>${escapeHtml(String(cell))}</td>`);
-                            }
-                        }
-                    }
-                    parts.push('</tr>');
-                }
-            }
-            else {
-                parts.push(`<tr><td colspan="${columns.length}" style="text-align:center">无数据</td></tr>`);
-            }
-            parts.push('</table>');
-        }
-    }
-    else {
-        parts.push(`<p>(${escapeHtml(fileName)}) 无表格数据</p>`);
-    }
-    parts.push('</div>');
-    return parts.join('\n');
-}
-function escapeHtml(text) {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
-function escapeRegex(str) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 function getDefaultTemplate() {
     return `<!DOCTYPE html>

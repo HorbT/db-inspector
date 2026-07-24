@@ -45,6 +45,11 @@ export declare class ReportDB {
     getAllResults(): Promise<(ResultRow & {
         rows: unknown[];
     })[]>;
+    /**
+     * Lazily load data rows for a single result by file_num.
+     * Use this instead of getAllResults().rows to avoid loading all data into memory at once.
+     */
+    loadResultRows(fileNum: number): Promise<unknown[]>;
     resultCount(): Promise<number>;
     setProgress(total: number, completed: number, status: string): Promise<void>;
     getProgress(): Promise<Progress>;
