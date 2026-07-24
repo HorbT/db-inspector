@@ -24,29 +24,29 @@ const buttonVariants = cva(
   }
 );
 
-// Omit keys whose types differ between React's ButtonHTMLAttributes and
-// framer-motion's HTMLMotionProps (e.g. onDrag, onAnimationStart) so the
-// intersection of the two is assignable to motion.button. We re-add the
-// plain DOM keys (children, className, style, etc.) that HTMLMotionProps
-// also exposes so consumers can pass them as plain React props.
-type ButtonBaseProps = Omit<
-  React.ButtonHTMLAttributes<HTMLButtonElement>,
-  keyof HTMLMotionProps<'button'>
-> &
-  Pick<
-    React.ButtonHTMLAttributes<HTMLButtonElement>,
-    'children' | 'className' | 'style'
-  >;
-
+// HTMLMotionProps<'button'> preserves all DOM button attrs (onClick, disabled,
+// type, aria-*, form, autoFocus, etc.) plus framer-motion extras. We narrow
+// `children` and `style` to their plain React types because framer-motion's
+// MotionValue variants are not assignable to Radix Slot when asChild=true.
+// Slot also cannot accept motion-only event handlers (onDrag,
+// onAnimationStart, etc.) which have different signatures than React DOM
+// handlers; these are never used with asChild since whileTap is stripped, so
+// casting Comp to a unified type is safe.
 export interface ButtonProps
-  extends ButtonBaseProps,
+  extends Omit<HTMLMotionProps<'button'>, 'children' | 'style'>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  children?: React.ReactNode;
+  style?: React.CSSProperties;
 }
+
+type ButtonComponent = React.ForwardRefExoticComponent<
+  ButtonProps & React.RefAttributes<HTMLButtonElement>
+>;
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : motion.button;
+    const Comp = (asChild ? Slot : motion.button) as ButtonComponent;
     return (
       <Comp
         className={cn(buttonVariants({ variant, size }), className)}
