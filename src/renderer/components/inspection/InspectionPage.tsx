@@ -11,12 +11,12 @@ import { AIAnalysisDialog } from './AIAnalysisDialog';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
 import { staggerContainerVariants, staggerItemVariants } from '@renderer/lib/motion';
-import type { InspectionProgress, InspectionResult } from '@shared/types';
+import type { InspectionProgress, InspectionResult, InspectionResultItem } from '@shared/types';
 
 export function InspectionPage(): React.ReactElement {
   const { selectedConnectionIds } = useConnectionStore();
   const {
-    isRunning, startInspection, addProgress, addResult, addLog,
+    isRunning, startInspection, addProgress, addResult, addResultItem, addLog,
     finishInspection, clearLogs, resultItems,
   } = useInspectionStore();
 
@@ -50,9 +50,15 @@ export function InspectionPage(): React.ReactElement {
       setIsDebugMode(false);
     });
 
+    const unsubResultItem = window.electronAPI.onInspectionResultItem((item: InspectionResultItem) => {
+      addResultItem(item);
+      hasResults.current = true;
+    });
+
     return () => {
       unsubProgress();
       unsubResult();
+      unsubResultItem();
     };
   }, []);
 
