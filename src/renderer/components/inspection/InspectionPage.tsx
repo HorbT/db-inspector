@@ -112,13 +112,13 @@ export function InspectionPage(): React.ReactElement {
         </div>
         <div className="flex gap-2">
           {latestReport && !isRunning && (
-            <Button variant="secondary" size="sm" onClick={handleAIAnalyze}>
-              <Sparkles className="h-3.5 w-3.5" />
+            <Button variant="secondary" onClick={handleAIAnalyze}>
+              <Sparkles className="h-4 w-4" />
               AI分析
             </Button>
           )}
-          <Button variant="secondary" size="sm" onClick={clearLogs}>
-            <Trash2 className="h-3.5 w-3.5" />
+          <Button variant="secondary" onClick={clearLogs}>
+            <Trash2 className="h-4 w-4" />
             清空日志
           </Button>
           <Button
