@@ -6,6 +6,7 @@ import { useInspectionStore } from '../../store/inspectionStore';
 import { ConnectionList } from '../connection/ConnectionList';
 import { ConnectionForm } from '../connection/ConnectionForm';
 import { ProgressLog } from './ProgressLog';
+import { LiveResultView } from './LiveResultView';
 import { AIAnalysisDialog } from './AIAnalysisDialog';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
@@ -16,7 +17,7 @@ export function InspectionPage(): React.ReactElement {
   const { selectedConnectionIds } = useConnectionStore();
   const {
     isRunning, startInspection, addProgress, addResult, addLog,
-    finishInspection, clearLogs,
+    finishInspection, clearLogs, resultItems,
   } = useInspectionStore();
 
   const [latestReport, setLatestReport] = useState<{ path: string; name: string } | null>(null);
@@ -152,7 +153,7 @@ export function InspectionPage(): React.ReactElement {
             <h2 className="font-semibold mb-3 text-sm">连接配置</h2>
             <ConnectionForm />
           </Card>
-          <Card className="p-4 flex-1 min-h-0">
+          <Card className="p-4 min-h-0 max-h-[40%] flex flex-col">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold text-sm">执行日志</h2>
               {latestReport && !isRunning && (
@@ -163,6 +164,10 @@ export function InspectionPage(): React.ReactElement {
               )}
             </div>
             <ProgressLog />
+          </Card>
+          <Card className="p-4 flex-1 min-h-0 flex flex-col">
+            <h2 className="font-semibold text-sm mb-3">实时结果</h2>
+            <LiveResultView items={resultItems} isRunning={isRunning} />
           </Card>
         </motion.div>
       </motion.div>
