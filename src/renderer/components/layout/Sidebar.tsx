@@ -51,7 +51,7 @@ export function Sidebar(): React.ReactElement {
             <motion.button
               key={item.id}
               onClick={() => setCurrentView(item.id)}
-              whileHover={{ backgroundColor: 'rgba(125, 125, 125, 0.1)' }}
+              whileHover={active ? undefined : { backgroundColor: 'rgba(125, 125, 125, 0.1)' }}
               className={cn(
                 'w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
                 active

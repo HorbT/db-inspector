@@ -13,6 +13,8 @@ export function StatusBar(): React.ReactElement {
         <span>{statusText}</span>
       </div>
       <div className="flex items-center gap-3">
+        {/* TODO(phase 7): wire to actual memory metric */}
+        <span>—</span>
         <span>v1.0.0</span>
       </div>
     </footer>
