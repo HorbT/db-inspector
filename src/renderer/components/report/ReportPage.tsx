@@ -73,6 +73,15 @@ export function ReportPage(): React.ReactElement {
           <h1 className="text-2xl font-bold tracking-tight">巡检报告</h1>
           <p className="text-sm text-muted-foreground mt-1">查看历史巡检报告</p>
         </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => loadReports(filter)}
+          title="刷新报告列表"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          刷新
+        </Button>
       </div>
 
       {/* Toolbar */}
