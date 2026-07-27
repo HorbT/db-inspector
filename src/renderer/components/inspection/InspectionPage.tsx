@@ -1,11 +1,16 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { Sparkles, Trash2, Play, Loader2 } from 'lucide-react';
 import { useConnectionStore } from '../../store/connectionStore';
 import { useInspectionStore } from '../../store/inspectionStore';
 import { ConnectionList } from '../connection/ConnectionList';
 import { ConnectionForm } from '../connection/ConnectionForm';
 import { ProgressLog } from './ProgressLog';
 import { AIAnalysisDialog } from './AIAnalysisDialog';
-import type { InspectionProgress, InspectionResult, InspectionResultItem } from '@shared/types';
+import { Button } from '@renderer/components/ui/button';
+import { Card } from '@renderer/components/ui/card';
+import { staggerContainerVariants, staggerItemVariants } from '@renderer/lib/motion';
+import type { InspectionProgress, InspectionResult } from '@shared/types';
 
 export function InspectionPage(): React.ReactElement {
   const { selectedConnectionIds } = useConnectionStore();
@@ -93,82 +98,74 @@ export function InspectionPage(): React.ReactElement {
 
   return (
     <div className="flex flex-col h-full gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">数据库巡检</h1>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">数据库巡检</h1>
+          <p className="text-sm text-muted-foreground mt-1">选择数据库连接开始巡检</p>
+        </div>
         <div className="flex gap-2">
           {latestReport && !isRunning && (
-            <button
-              onClick={handleAIAnalyze}
-              className="btn-primary text-xs flex items-center gap-1.5"
-              title="AI分析巡检日志"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-              </svg>
-              AI分析巡检日志
-            </button>
+            <Button variant="secondary" size="sm" onClick={handleAIAnalyze}>
+              <Sparkles className="h-3.5 w-3.5" />
+              AI分析
+            </Button>
           )}
-          <button onClick={clearLogs} className="btn-secondary text-xs">
+          <Button variant="secondary" size="sm" onClick={clearLogs}>
+            <Trash2 className="h-3.5 w-3.5" />
             清空日志
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleStartInspection}
             disabled={isRunning}
-            className={`btn-primary ${isDebugMode ? 'bg-warning text-black hover:bg-warning/90' : ''}`}
+            variant={isDebugMode ? 'destructive' : 'primary'}
             title="按住Shift键点击进入Debug模式"
           >
             {isRunning ? (
-              <span className="flex items-center gap-2">
-                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
                 {isDebugMode ? 'DEBUG巡检中...' : '巡检中...'}
-              </span>
+              </>
             ) : (
-              <span className="flex items-center gap-1.5">
+              <>
+                <Play className="h-4 w-4" />
                 执行巡检
-                <span className="text-[10px] opacity-60">(Shift+D)</span>
-              </span>
+              </>
             )}
-          </button>
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
-        {/* Left: Connection List */}
-        <div className="lg:col-span-1 flex flex-col gap-4 min-h-0">
-          <div className="card p-4 flex-1 overflow-auto">
+      <motion.div
+        variants={staggerContainerVariants}
+        initial="hidden"
+        animate="visible"
+        className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0"
+      >
+        <motion.div variants={staggerItemVariants} className="lg:col-span-1 flex flex-col gap-4 min-h-0">
+          <Card className="p-4 flex-1 overflow-auto">
             <h2 className="font-semibold mb-3 text-sm">数据库连接列表</h2>
             <ConnectionList />
-          </div>
-        </div>
-
-        {/* Right: Connection Form + Log */}
-        <div className="lg:col-span-2 flex flex-col gap-4 min-h-0">
-          <div className="card p-4">
+          </Card>
+        </motion.div>
+        <motion.div variants={staggerItemVariants} className="lg:col-span-2 flex flex-col gap-4 min-h-0">
+          <Card className="p-4">
             <h2 className="font-semibold mb-3 text-sm">连接配置</h2>
             <ConnectionForm />
-          </div>
-          <div className="card p-4 flex-1 min-h-0">
+          </Card>
+          <Card className="p-4 flex-1 min-h-0">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold text-sm">执行日志</h2>
               {latestReport && !isRunning && (
-                <button
-                  onClick={handleAIAnalyze}
-                  className="btn-primary text-xs h-7 px-3 flex items-center gap-1.5"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                    <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                  </svg>
+                <Button variant="secondary" size="sm" onClick={handleAIAnalyze}>
+                  <Sparkles className="h-3.5 w-3.5" />
                   AI分析
-                </button>
+                </Button>
               )}
             </div>
             <ProgressLog />
-          </div>
-        </div>
-      </div>
+          </Card>
+        </motion.div>
+      </motion.div>
 
       {/* AI Analysis Dialog */}
       {showAIAnalysis && latestReport && (
