@@ -15,7 +15,7 @@ import { cn } from '@renderer/lib/utils';
 
 export function ReportPage(): React.ReactElement {
   const {
-    reports, selectedReport, reportContent,
+    reports, selectedReport,
     loading, loadReports, selectReport, loadReportContent,
     deleteReports, filter, setFilter,
   } = useReportStore();
@@ -130,15 +130,6 @@ export function ReportPage(): React.ReactElement {
             搜索
           </Button>
         </div>
-
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => loadReports(filter)}
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          刷新
-        </Button>
       </div>
 
       <motion.div
