@@ -131,7 +131,7 @@ export function ConnectionList(): React.ReactElement {
           return (
             <motion.div
               key={conn.id}
-              whileHover={{ y: -2 }}
+              variants={staggerItemVariants}
               onClick={() => toggleConnectionSelection(conn.id)}
               className="cursor-pointer"
             >

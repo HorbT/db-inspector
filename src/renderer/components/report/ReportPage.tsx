@@ -163,7 +163,6 @@ export function ReportPage(): React.ReactElement {
                   <motion.div
                     key={report.id}
                     variants={staggerItemVariants}
-                    whileHover={{ y: -2 }}
                   >
                     <Card
                       onClick={() => handleViewReport(report)}
@@ -171,7 +170,7 @@ export function ReportPage(): React.ReactElement {
                       'p-2.5 cursor-pointer text-sm group',
                       selectedReport?.id === report.id
                         ? 'border-primary bg-primary/5 shadow-md'
-                        : 'border-transparent hover:bg-muted/50 shadow-none hover:shadow-none'
+                        : 'border-transparent hover:bg-muted/50'
                     )}
                     >
                       <div className="flex items-center justify-between">
