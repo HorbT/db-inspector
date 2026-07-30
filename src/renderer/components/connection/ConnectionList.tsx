@@ -123,7 +123,7 @@ export function ConnectionList(): React.ReactElement {
       </div>
 
       {/* Connection list */}
-      <div className="space-y-1.5 overflow-auto flex-1">
+      <div className="space-y-1.5 overflow-auto flex-1 p-1 -m-1">
         {filteredConnections.map((conn) => {
           const plugin = getPluginInfo(conn.dbType);
           const isSelected = selectedConnectionIds.includes(conn.id);
@@ -131,6 +131,7 @@ export function ConnectionList(): React.ReactElement {
           return (
             <motion.div
               key={conn.id}
+              whileHover={{ y: -2, transition: { duration: 0.2, ease: 'easeOut' } }}
               onClick={() => toggleConnectionSelection(conn.id)}
               className="cursor-pointer"
             >

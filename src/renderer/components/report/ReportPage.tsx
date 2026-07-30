@@ -163,6 +163,7 @@ export function ReportPage(): React.ReactElement {
                   <motion.div
                     key={report.id}
                     variants={staggerItemVariants}
+                    whileHover={{ y: -2, transition: { duration: 0.2, ease: 'easeOut' } }}
                   >
                     <Card
                       onClick={() => handleViewReport(report)}
