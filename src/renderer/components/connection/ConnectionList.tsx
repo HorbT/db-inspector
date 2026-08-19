@@ -1,11 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Database, RefreshCw, CheckSquare, Trash2 } from 'lucide-react';
+import { Database, RefreshCw, CheckSquare, Trash2, AlertTriangle } from 'lucide-react';
 import { useConnectionStore } from '../../store/connectionStore';
 import { DB_TYPE_LABELS, SUPPORTED_DB_TYPES } from '@shared/constants';
 import type { DBType } from '@shared/constants';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@renderer/components/ui/dialog';
 import { EmptyState } from '@renderer/components/common/EmptyState';
 import { cn } from '@renderer/lib/utils';
 
@@ -17,6 +25,7 @@ export function ConnectionList(): React.ReactElement {
   } = useConnectionStore();
 
   const [filterDbType, setFilterDbType] = useState<string>('all');
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Get unique db types from existing connections for tabs
   const existingTypes = useMemo(() => {
@@ -37,6 +46,12 @@ export function ConnectionList(): React.ReactElement {
   const handleDelete = async () => {
     if (selectedConnectionIds.length === 0) return;
     await deleteConnections(selectedConnectionIds);
+    setConfirmDelete(false);
+  };
+
+  const handleRequestDelete = () => {
+    if (selectedConnectionIds.length === 0) return;
+    setConfirmDelete(true);
   };
 
   const handleRefresh = () => {
@@ -115,7 +130,7 @@ export function ConnectionList(): React.ReactElement {
           {allFilteredSelected ? '取消全选' : '全选'}
         </Button>
         {selectedConnectionIds.length > 0 && (
-          <Button variant="destructive" size="sm" onClick={handleDelete}>
+          <Button variant="destructive" size="sm" onClick={handleRequestDelete}>
             <Trash2 className="h-3.5 w-3.5" />
             删除 ({selectedConnectionIds.length})
           </Button>
@@ -162,6 +177,30 @@ export function ConnectionList(): React.ReactElement {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-danger" />
+              确认删除连接
+            </DialogTitle>
+            <DialogDescription>
+              将删除 <span className="font-semibold text-foreground">{selectedConnectionIds.length}</span> 个数据库连接，此操作不可撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="secondary" onClick={() => setConfirmDelete(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              <Trash2 className="h-3.5 w-3.5" />
+              确认删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
