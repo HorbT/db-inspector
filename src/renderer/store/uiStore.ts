@@ -17,6 +17,7 @@ interface UIState {
   toasts: Toast[];
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  cycleTheme: () => void;
   setCurrentView: (view: View) => void;
   toggleSidebar: () => void;
   applyTheme: (theme: Theme) => void;
@@ -41,6 +42,14 @@ export const useUIStore = create<UIState>((set, get) => ({
     const current = get().theme;
     const next = current === 'dark' ? 'light' : 'dark';
     get().setTheme(next);
+  },
+
+  cycleTheme: () => {
+    const order: Theme[] = ['light', 'dark', 'system'];
+    const current = get().theme;
+    const next = order[(order.indexOf(current) + 1) % order.length];
+    set({ theme: next });
+    get().applyTheme(next);
   },
 
   setCurrentView: (view) => set({ currentView: view }),

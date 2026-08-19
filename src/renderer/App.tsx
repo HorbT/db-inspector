@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
+import { MotionConfig } from 'framer-motion';
 import { useUIStore } from './store/uiStore';
 import { useConnectionStore } from './store/connectionStore';
 import { AppShell } from './components/layout/AppShell';
+import { defaultTransition } from './lib/motion';
 
 export function App(): React.ReactElement {
   const { theme, applyTheme } = useUIStore();
@@ -23,5 +25,9 @@ export function App(): React.ReactElement {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  return <AppShell />;
+  return (
+    <MotionConfig transition={defaultTransition} reducedMotion="user">
+      <AppShell />
+    </MotionConfig>
+  );
 }

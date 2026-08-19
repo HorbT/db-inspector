@@ -1,3 +1,4 @@
 releasev*
 release/
 node_modules
+.superpowers/

@@ -1,7 +1,13 @@
 import React, { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { Database, RefreshCw, CheckSquare, Trash2 } from 'lucide-react';
 import { useConnectionStore } from '../../store/connectionStore';
 import { DB_TYPE_LABELS, SUPPORTED_DB_TYPES } from '@shared/constants';
 import type { DBType } from '@shared/constants';
+import { Button } from '@renderer/components/ui/button';
+import { Card } from '@renderer/components/ui/card';
+import { EmptyState } from '@renderer/components/common/EmptyState';
+import { cn } from '@renderer/lib/utils';
 
 export function ConnectionList(): React.ReactElement {
   const {
@@ -59,29 +65,26 @@ export function ConnectionList(): React.ReactElement {
 
   if (connections.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-        <svg className="w-12 h-12 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-          <path d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7" />
-          <ellipse cx="12" cy="4" rx="8" ry="2" />
-          <line x1="12" y1="6" x2="12" y2="12" />
-        </svg>
-        <p className="text-sm">暂无数据库连接</p>
-        <p className="text-xs mt-1">请在右侧添加连接</p>
-      </div>
+      <EmptyState
+        icon={Database}
+        title="暂无数据库连接"
+        description="请在右侧添加连接"
+      />
     );
   }
 
   return (
     <div className="flex flex-col h-full">
-      {/* DB Type filter tabs */}
+      {/* DB Type filter tabs (Badge-style) */}
       <div className="flex gap-1 mb-2 flex-wrap">
         <button
           onClick={() => setFilterDbType('all')}
-          className={`px-2 py-0.5 rounded text-xs transition-colors ${
+          className={cn(
+            'inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors',
             filterDbType === 'all'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-          }`}
+              ? 'border-transparent bg-primary text-primary-foreground'
+              : 'border-border text-muted-foreground hover:text-foreground'
+          )}
         >
           全部 ({connections.length})
         </button>
@@ -89,11 +92,12 @@ export function ConnectionList(): React.ReactElement {
           <button
             key={type}
             onClick={() => setFilterDbType(type)}
-            className={`px-2 py-0.5 rounded text-xs transition-colors ${
+            className={cn(
+              'inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors',
               filterDbType === type
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
+                ? 'border-transparent bg-primary text-primary-foreground'
+                : 'border-border text-muted-foreground hover:text-foreground'
+            )}
           >
             {DB_TYPE_LABELS[type as DBType] || type} ({connections.filter(c => c.dbType === type).length})
           </button>
@@ -102,52 +106,54 @@ export function ConnectionList(): React.ReactElement {
 
       {/* Action buttons */}
       <div className="flex gap-1 mb-2">
-        <button onClick={handleRefresh} className="text-xs btn-secondary py-1 px-2" title="刷新列表">
+        <Button variant="secondary" size="sm" onClick={handleRefresh} title="刷新列表">
+          <RefreshCw className="h-3.5 w-3.5" />
           刷新
-        </button>
-        <button
-          onClick={handleSelectAll}
-          className={`text-xs py-1 px-2 rounded transition-colors ${
-            allFilteredSelected
-              ? 'bg-muted text-muted-foreground'
-              : 'btn-secondary'
-          }`}
-        >
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handleSelectAll}>
+          <CheckSquare className="h-3.5 w-3.5" />
           {allFilteredSelected ? '取消全选' : '全选'}
-        </button>
+        </Button>
         {selectedConnectionIds.length > 0 && (
-          <button onClick={handleDelete} className="text-xs btn-danger py-1 px-2">
+          <Button variant="destructive" size="sm" onClick={handleDelete}>
+            <Trash2 className="h-3.5 w-3.5" />
             删除 ({selectedConnectionIds.length})
-          </button>
+          </Button>
         )}
       </div>
 
       {/* Connection list */}
-      <div className="space-y-1.5 overflow-auto flex-1">
+      <div className="space-y-1.5 flex-1">
         {filteredConnections.map((conn) => {
           const plugin = getPluginInfo(conn.dbType);
           const isSelected = selectedConnectionIds.includes(conn.id);
 
           return (
-            <div
+            <motion.div
               key={conn.id}
+              whileHover={{ y: -2, transition: { duration: 0.2, ease: 'easeOut' } }}
               onClick={() => toggleConnectionSelection(conn.id)}
-              className={`p-2.5 rounded-md cursor-pointer border transition-all text-sm ${
-                isSelected
-                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                  : 'border-transparent hover:bg-muted/50'
-              }`}
+              className="cursor-pointer"
             >
-              <div className="flex items-center justify-between">
-                <span className="font-medium truncate">{conn.description}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                  {plugin?.name || conn.dbType}
-                </span>
-              </div>
-              <div className="text-xs text-muted-foreground mt-1 truncate">
-                {conn.host}:{conn.port}/{conn.database}
-              </div>
-            </div>
+              <Card
+                className={cn(
+                  'p-2.5 text-sm cursor-pointer',
+                  isSelected
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                    : 'border-transparent hover:bg-muted/50'
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium truncate">{conn.description}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                    {plugin?.name || conn.dbType}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1 truncate">
+                  {conn.host}:{conn.port}/{conn.database}
+                </div>
+              </Card>
+            </motion.div>
           );
         })}
         {filteredConnections.length === 0 && (
