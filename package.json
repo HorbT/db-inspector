@@ -4,7 +4,7 @@
   "description": "统一数据库巡检平台 - 支持MySQL/Oracle/SQLServer/TiDB",
   "main": "dist/main/main/index.js",
   "author": "DB Inspector Team",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc -p tsconfig.node.json && tsc-alias -p tsconfig.node.json && electron .",
