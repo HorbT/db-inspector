@@ -154,12 +154,12 @@ export function InspectionPage(): React.ReactElement {
             <ConnectionList />
           </Card>
         </motion.div>
-        <motion.div variants={staggerItemVariants} className="lg:col-span-2 flex flex-col gap-4 min-h-0">
-          <Card className="p-4">
+        <motion.div variants={staggerItemVariants} className="lg:col-span-2 flex flex-col gap-4 min-h-0 overflow-hidden">
+          <Card className="p-4 shrink-0">
             <h2 className="font-semibold mb-3 text-sm">连接配置</h2>
             <ConnectionForm />
           </Card>
-          <Card className="p-4 min-h-0 max-h-[40%] flex flex-col">
+          <Card className="p-4 min-h-0 max-h-[40%] flex flex-col shrink-0">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold text-sm">执行日志</h2>
               {latestReport && !isRunning && (
